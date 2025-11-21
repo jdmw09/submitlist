@@ -1,0 +1,179 @@
+/**
+ * ThemeToggle Component Styles
+ * Uses theme CSS variables for consistent theming
+ */
+
+.theme-toggle {
+  position: relative;
+  display: inline-block;
+}
+
+.theme-toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: var(--theme-bg-secondary);
+  border: 1px solid var(--theme-border-medium);
+  border-radius: 8px;
+  color: var(--theme-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.theme-toggle-button:hover {
+  background-color: var(--theme-bg-tertiary);
+  border-color: var(--theme-border-strong);
+}
+
+.theme-toggle-button:focus {
+  border-color: var(--theme-border-focus);
+  box-shadow: 0 0 0 3px var(--theme-primary-light);
+}
+
+.theme-toggle-button:active {
+  transform: scale(0.98);
+}
+
+.theme-toggle-icon {
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle-label {
+  user-select: none;
+}
+
+.theme-toggle-chevron {
+  transition: transform 0.2s ease;
+  color: var(--theme-text-secondary);
+}
+
+.theme-toggle-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* Dropdown Menu */
+.theme-toggle-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 180px;
+  background-color: var(--theme-bg-elevated);
+  border: 1px solid var(--theme-border-medium);
+  border-radius: 8px;
+  box-shadow: var(--theme-shadow-lg);
+  padding: 4px;
+  z-index: 1000;
+  animation: dropdownFadeIn 0.15s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Theme Options */
+.theme-toggle-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--theme-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  outline: none;
+}
+
+.theme-toggle-option:hover {
+  background-color: var(--theme-bg-tertiary);
+}
+
+.theme-toggle-option:focus {
+  background-color: var(--theme-bg-tertiary);
+  box-shadow: 0 0 0 2px var(--theme-border-focus);
+}
+
+.theme-toggle-option.active {
+  background-color: var(--theme-primary-light);
+  color: var(--theme-primary);
+}
+
+.theme-toggle-option.active:hover {
+  background-color: var(--theme-primary-light);
+}
+
+.theme-option-icon {
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.theme-option-label {
+  flex: 1;
+  user-select: none;
+}
+
+.theme-option-check {
+  color: var(--theme-primary);
+  flex-shrink: 0;
+}
+
+.theme-option-hint {
+  font-size: 12px;
+  color: var(--theme-text-secondary);
+  font-weight: 400;
+  margin-left: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .theme-toggle-label {
+    display: none;
+  }
+
+  .theme-toggle-button {
+    padding: 8px;
+  }
+
+  .theme-toggle-dropdown {
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+/* Accessibility: Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle-button,
+  .theme-toggle-chevron,
+  .theme-toggle-option {
+    transition: none;
+  }
+
+  .theme-toggle-dropdown {
+    animation: none;
+  }
+}

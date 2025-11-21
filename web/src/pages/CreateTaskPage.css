@@ -1,0 +1,229 @@
+.create-task-page {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.create-task-page h1 {
+  margin-bottom: 32px;
+  color: var(--color-text-primary);
+}
+
+.task-form {
+  background: var(--color-bg-primary);
+  padding: 32px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-base);
+}
+
+.date-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 600px) {
+  .date-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.requirements-section {
+  margin: 24px 0;
+}
+
+.requirements-section > label {
+  display: block;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.requirement-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.requirement-row textarea {
+  flex: 1;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.btn-remove {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #f44336;
+  color: white;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.btn-remove:hover {
+  background: #d32f2f;
+}
+
+.schedule-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.schedule-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 2px solid var(--color-border-default);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+.schedule-option:hover {
+  border-color: var(--color-primary-500);
+  background: var(--color-bg-secondary);
+}
+
+.schedule-option input[type="radio"]:checked + span {
+  color: var(--color-primary-500);
+  font-weight: 600;
+}
+
+.schedule-option input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.schedule-option span {
+  text-transform: capitalize;
+}
+
+.schedule-info {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--color-primary-50);
+  border-left: 4px solid var(--color-primary-500);
+  border-radius: 4px;
+}
+
+@media (prefers-color-scheme: dark), [data-theme="dark"] {
+  .schedule-info {
+    background: rgba(33, 150, 243, 0.15);
+  }
+}
+
+.schedule-info p {
+  margin: 0;
+  color: var(--color-primary-700);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+@media (prefers-color-scheme: dark), [data-theme="dark"] {
+  .schedule-info p {
+    color: var(--color-primary-300);
+  }
+}
+
+.schedule-info strong {
+  color: var(--color-primary-800);
+}
+
+@media (prefers-color-scheme: dark), [data-theme="dark"] {
+  .schedule-info strong {
+    color: var(--color-primary-200);
+  }
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.form-actions .btn {
+  flex: 1;
+}
+
+.assignee-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--color-bg-secondary);
+}
+
+.assignee-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: var(--color-bg-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.assignee-checkbox:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.assignee-checkbox input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.assignee-checkbox span {
+  flex: 1;
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
+.no-members {
+  text-align: center;
+  color: var(--color-text-tertiary);
+  padding: 20px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--color-bg-tertiary);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.checkbox-label span {
+  flex: 1;
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
+.input-group small {
+  display: block;
+  margin-top: 8px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}

@@ -1,0 +1,24 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies including dev dependencies
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Create uploads directory
+RUN mkdir -p uploads
+
+# Create migrations directory if it doesn't exist
+RUN mkdir -p src/database/migrations
+
+# Expose port
+EXPOSE 3000
+
+# Start with hot reload using nodemon
+CMD ["npm", "run", "dev"]
