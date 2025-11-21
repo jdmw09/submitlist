@@ -1,68 +1,66 @@
-# Subscription Billing System Design (Simplified)
+# Subscription Billing System Design
 
 ## Overview
 
-Simple two-tier subscription model with storage-based pricing.
+Three-tier subscription model with fixed pricing, compatible with both Stripe and App Store IAP.
 
 ---
 
 ## Subscription Tiers
 
+| | Free | Paid | Premium |
+|---|---|---|---|
+| **Price** | $0 | $20/year | $99/year |
+| **Storage** | 250 MB | 5 GB | 100 GB |
+| **File Retention** | 7 days | 30 days | Forever |
+| **Features** | All | All | All |
+
+---
+
 ### Free Tier
 **Price:** $0
 
-**Limits:**
 - 250 MB storage max
 - Files auto-deleted after 7 days
-- All features included (no feature gating)
-
-**Use Case:** Try the app, small personal use
+- All features included
 
 ---
 
 ### Paid Tier
-**Price:** $20/year (billed annually)
+**Price:** $20/year
 
-**Includes:**
-- 5 GB storage included
+- 5 GB storage max
+- Files auto-deleted after 30 days
+- All features included
+
+---
+
+### Premium Tier
+**Price:** $99/year
+
+- 100 GB storage max
 - Files never auto-deleted
 - All features included
 
-**Overage:**
-- Storage over 5 GB: $0.05/GB/month
-- Always rounded UP to next GB
-- Example: 5.1 GB used = 1 GB overage = $0.05/month
-
-**Use Case:** Teams, organizations, long-term use
-
 ---
 
-## Storage Calculation
+## Why This Works for IAP
 
-```
-Overage GB = CEILING(current_storage_bytes / 1073741824) - 5
-Overage charge = MAX(0, Overage GB) * $0.05/month
-```
+| Requirement | Status |
+|-------------|--------|
+| Fixed pricing | ✅ $20/yr and $99/yr |
+| No metered/usage billing | ✅ Hard storage limits |
+| Annual subscriptions | ✅ Supported by IAP |
+| Auto-renewal | ✅ Handled by App Store |
 
-**Examples:**
-| Storage Used | Included | Overage | Monthly Charge |
-|--------------|----------|---------|----------------|
-| 2.5 GB | 5 GB | 0 GB | $0 |
-| 5.0 GB | 5 GB | 0 GB | $0 |
-| 5.1 GB | 5 GB | 1 GB | $0.05 |
-| 7.3 GB | 5 GB | 3 GB | $0.15 |
-| 12.0 GB | 5 GB | 7 GB | $0.35 |
-| 25.8 GB | 5 GB | 21 GB | $1.05 |
+**Revenue comparison:**
 
----
+| Tier | Price | Stripe (97%) | IAP (70%) | IAP Small Biz (85%) |
+|------|-------|--------------|-----------|---------------------|
+| Paid | $20/yr | $19.40 | $14.00 | $17.00 |
+| Premium | $99/yr | $96.00 | $69.30 | $84.15 |
 
-## Trial Period
-
-- **Duration:** 14 days
-- **Access:** Full Paid tier features
-- **Payment required:** Yes, upfront (card on file)
-- **At trial end:** Auto-converts to Paid ($20 charged)
-- **Cancel before trial ends:** No charge
+*Small Business Program: <$1M annual revenue = 15% fee instead of 30%*
 
 ---
 
@@ -70,102 +68,109 @@ Overage charge = MAX(0, Overage GB) * $0.05/month
 
 | Policy | Decision |
 |--------|----------|
-| Trial length | 14 days |
-| Payment upfront | Yes (required for trial) |
-| Downgrade enforcement | Hard - at end of paid period |
-| Free tier | Truly free (no card required) |
-| Billing cycle | Annual only ($20/year) |
+| Trial length | 14 days (Premium features) |
+| Payment upfront | Yes |
+| Downgrade enforcement | Hard - at period end |
 | Grace period | None |
-| Refunds | None |
+| Refunds | None (App Store handles) |
 
 ---
 
-## Downgrade Flow (Paid → Free)
+## Storage & Retention Enforcement
 
-**When user cancels or doesn't renew:**
+### Hard Storage Limits
 
-1. Subscription ends at period end
-2. Account converts to Free tier
-3. **Hard enforcement:**
-   - If storage > 250 MB: User must delete files
-   - Files over 7 days old: Auto-deleted
-   - Cannot upload new files until under 250 MB
-4. Email notification 7 days before expiry
-5. Email notification on downgrade day
+```typescript
+async function canUpload(orgId: number, fileSize: number): Promise<boolean> {
+  const storage = await getStorageUsage(orgId);
+  const plan = await getOrgPlan(orgId);
 
-**Storage cleanup for downgrade:**
-```sql
--- Auto-delete files older than 7 days for free users
-DELETE FROM task_completions
-WHERE organization_id IN (
-  SELECT organization_id FROM organization_subscriptions
-  WHERE status != 'active'
-)
-AND file_path IS NOT NULL
-AND completed_at < CURRENT_TIMESTAMP - INTERVAL '7 days';
+  if (storage.used_bytes + fileSize > plan.max_storage_bytes) {
+    const planNames = { free: 'Free', paid: 'Paid', premium: 'Premium' };
+    const upgradeTo = plan.slug === 'free' ? 'Paid' : 'Premium';
+
+    throw new StorageLimitError(
+      `Storage limit reached (${formatBytes(plan.max_storage_bytes)}). ` +
+      `Upgrade to ${upgradeTo} for more storage.`
+    );
+  }
+  return true;
+}
 ```
 
----
+### Auto-Delete Cron (Daily at 2 AM)
 
-## File Auto-Delete (Free Tier)
-
-**Daily cron job:**
 ```typescript
-// Runs daily at 2 AM
 cron.schedule('0 2 * * *', async () => {
-  // Get all free-tier organizations
-  const freeOrgs = await db.query(`
-    SELECT o.id FROM organizations o
+  // Free tier: delete files older than 7 days
+  await deleteExpiredFiles('free', 7);
+
+  // Paid tier: delete files older than 30 days
+  await deleteExpiredFiles('paid', 30);
+
+  // Premium tier: no auto-delete
+});
+
+async function deleteExpiredFiles(planSlug: string, retentionDays: number) {
+  const result = await db.query(`
+    DELETE FROM task_completions tc
+    USING tasks t, organizations o
     LEFT JOIN organization_subscriptions os ON o.id = os.organization_id
-    WHERE os.id IS NULL OR os.status != 'active'
+    LEFT JOIN subscription_plans sp ON os.plan_id = sp.id
+    WHERE tc.task_id = t.id
+    AND t.organization_id = o.id
+    AND tc.file_path IS NOT NULL
+    AND tc.completed_at < CURRENT_TIMESTAMP - INTERVAL '${retentionDays} days'
+    AND (
+      (sp.slug IS NULL AND '${planSlug}' = 'free') OR
+      sp.slug = '${planSlug}'
+    )
+    RETURNING tc.file_path, t.organization_id
   `);
 
-  for (const org of freeOrgs.rows) {
-    // Delete files older than 7 days
-    const deleted = await db.query(`
-      DELETE FROM task_completions
-      WHERE task_id IN (SELECT id FROM tasks WHERE organization_id = $1)
-      AND file_path IS NOT NULL
-      AND completed_at < CURRENT_TIMESTAMP - INTERVAL '7 days'
-      RETURNING file_path
-    `, [org.id]);
-
-    // Delete actual files from storage
-    for (const file of deleted.rows) {
-      await deleteFile(file.file_path);
-    }
-
-    // Update storage usage
-    await recalculateStorage(org.id);
+  // Delete actual files and update storage
+  for (const row of result.rows) {
+    await deleteFileFromDisk(row.file_path);
+    await recalculateStorage(row.organization_id);
   }
-});
+
+  console.log(`Deleted ${result.rowCount} expired files for ${planSlug} tier`);
+}
 ```
 
 ---
 
 ## Database Schema
 
-### 1. `subscription_plans` Table (Simplified)
+### 1. `subscription_plans` Table
 
 ```sql
 CREATE TABLE subscription_plans (
   id SERIAL PRIMARY KEY,
-  name VARCHAR(50) NOT NULL,           -- 'Free', 'Paid'
-  slug VARCHAR(20) UNIQUE NOT NULL,    -- 'free', 'paid'
-  price_cents INTEGER NOT NULL,        -- 0 or 2000
-  billing_interval VARCHAR(20),        -- NULL for free, 'year' for paid
-  max_storage_bytes BIGINT NOT NULL,   -- 262144000 (250MB) or 5368709120 (5GB)
-  file_retention_days INTEGER,         -- 7 for free, NULL for paid (forever)
-  overage_per_gb_cents INTEGER,        -- NULL for free, 5 for paid
+  name VARCHAR(50) NOT NULL,              -- 'Free', 'Paid', 'Premium'
+  slug VARCHAR(20) UNIQUE NOT NULL,       -- 'free', 'paid', 'premium'
+  price_cents INTEGER NOT NULL,           -- 0, 2000, 9900
+  billing_interval VARCHAR(20),           -- NULL, 'year', 'year'
+  max_storage_bytes BIGINT NOT NULL,
+  file_retention_days INTEGER,            -- 7, 30, NULL (forever)
+
+  -- Platform-specific IDs
   stripe_price_id VARCHAR(255),
+  apple_product_id VARCHAR(255),
+  google_product_id VARCHAR(255),
+
+  display_order INTEGER DEFAULT 0,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Seed data
-INSERT INTO subscription_plans (name, slug, price_cents, billing_interval, max_storage_bytes, file_retention_days, overage_per_gb_cents) VALUES
-('Free', 'free', 0, NULL, 262144000, 7, NULL),
-('Paid', 'paid', 2000, 'year', 5368709120, NULL, 5);
+INSERT INTO subscription_plans
+(name, slug, price_cents, billing_interval, max_storage_bytes, file_retention_days, display_order)
+VALUES
+('Free', 'free', 0, NULL, 262144000, 7, 1),           -- 250 MB
+('Paid', 'paid', 2000, 'year', 5368709120, 30, 2),    -- 5 GB
+('Premium', 'premium', 9900, 'year', 107374182400, NULL, 3);  -- 100 GB
 ```
 
 ### 2. `organization_subscriptions` Table
@@ -176,8 +181,7 @@ CREATE TABLE organization_subscriptions (
   organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE UNIQUE,
   plan_id INTEGER REFERENCES subscription_plans(id),
 
-  -- Status
-  status VARCHAR(30) NOT NULL,         -- 'trialing', 'active', 'canceled', 'expired'
+  status VARCHAR(30) NOT NULL,            -- 'trialing', 'active', 'canceled', 'expired'
 
   -- Dates
   trial_end TIMESTAMP,
@@ -185,16 +189,19 @@ CREATE TABLE organization_subscriptions (
   current_period_end TIMESTAMP,
   canceled_at TIMESTAMP,
 
-  -- Stripe
+  -- Payment platform (only one will be set)
+  payment_platform VARCHAR(20),           -- 'stripe', 'apple', 'google'
   stripe_customer_id VARCHAR(255),
-  stripe_subscription_id VARCHAR(255) UNIQUE,
+  stripe_subscription_id VARCHAR(255),
+  apple_transaction_id VARCHAR(255),
+  google_purchase_token TEXT,
 
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_org_sub_org ON organization_subscriptions(organization_id);
 CREATE INDEX idx_org_sub_status ON organization_subscriptions(status);
+CREATE INDEX idx_org_sub_platform ON organization_subscriptions(payment_platform);
 ```
 
 ### 3. `organization_storage` Table
@@ -206,176 +213,268 @@ CREATE TABLE organization_storage (
   storage_used_bytes BIGINT DEFAULT 0,
   last_calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_org_storage_org ON organization_storage(organization_id);
 ```
 
-### 4. `storage_overages` Table (Monthly tracking)
+### 4. `subscription_receipts` Table
 
 ```sql
-CREATE TABLE storage_overages (
+CREATE TABLE subscription_receipts (
   id SERIAL PRIMARY KEY,
   organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
-  month_year VARCHAR(7) NOT NULL,      -- '2025-11'
-  peak_storage_bytes BIGINT NOT NULL,
-  overage_gb INTEGER NOT NULL,
-  charge_cents INTEGER NOT NULL,
-  stripe_invoice_item_id VARCHAR(255),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(organization_id, month_year)
-);
-```
+  payment_platform VARCHAR(20) NOT NULL,
 
-### 5. `subscription_invoices` Table
+  -- Platform-specific receipt data
+  stripe_invoice_id VARCHAR(255),
+  apple_transaction_id VARCHAR(255),
+  google_order_id VARCHAR(255),
 
-```sql
-CREATE TABLE subscription_invoices (
-  id SERIAL PRIMARY KEY,
-  organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
-  stripe_invoice_id VARCHAR(255) UNIQUE,
   amount_cents INTEGER NOT NULL,
-  status VARCHAR(30) NOT NULL,         -- 'paid', 'open', 'void'
-  invoice_date TIMESTAMP NOT NULL,
-  paid_at TIMESTAMP,
-  invoice_pdf_url TEXT,
+  currency VARCHAR(3) DEFAULT 'usd',
+  receipt_date TIMESTAMP NOT NULL,
+
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
 ---
 
-## Stripe Integration
+## Payment Platform Integration
 
-### Products & Prices
-
-**Create in Stripe Dashboard:**
-1. Product: "TaskManager Paid"
-2. Price: $20.00 USD / year
-3. Enable metered billing for overages (optional add-on)
-
-### Checkout Flow
+### Option 1: Stripe (Web)
 
 ```typescript
 // POST /api/billing/checkout
-router.post('/checkout',
-  authenticateToken,
-  requireOrgAdmin,
-  async (req: AuthRequest, res) => {
-    const orgId = req.user!.currentOrgId;
-    const org = await getOrganization(orgId);
+router.post('/checkout', authenticateToken, requireOrgAdmin, async (req, res) => {
+  const { planSlug } = req.body;  // 'paid' or 'premium'
+  const orgId = req.user!.currentOrgId;
 
-    // Get or create Stripe customer
-    let customerId = org.stripe_customer_id;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: req.user!.email,
-        metadata: { organization_id: orgId.toString() }
-      });
-      customerId = customer.id;
-      await saveStripeCustomerId(orgId, customerId);
-    }
+  const plan = await getPlanBySlug(planSlug);
 
-    // Create checkout session with 14-day trial
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      payment_method_types: ['card'],
-      line_items: [{
-        price: process.env.STRIPE_PAID_PRICE_ID,
-        quantity: 1,
-      }],
-      mode: 'subscription',
-      subscription_data: {
-        trial_period_days: 14,
-      },
-      success_url: `${process.env.APP_URL}/billing/success`,
-      cancel_url: `${process.env.APP_URL}/billing`,
-    });
+  const session = await stripe.checkout.sessions.create({
+    customer: await getOrCreateStripeCustomer(orgId, req.user!.email),
+    line_items: [{ price: plan.stripe_price_id, quantity: 1 }],
+    mode: 'subscription',
+    subscription_data: { trial_period_days: 14 },
+    success_url: `${APP_URL}/billing/success`,
+    cancel_url: `${APP_URL}/billing`,
+    metadata: { organization_id: orgId.toString(), plan_slug: planSlug }
+  });
 
-    res.json({ url: session.url });
-  }
-);
-```
-
-### Webhook Events
-
-```typescript
-// Handle these Stripe webhook events:
-const webhookHandlers = {
-  'customer.subscription.created': async (sub) => {
-    await createSubscription(sub.metadata.organization_id, {
-      status: sub.status,  // 'trialing' or 'active'
-      trial_end: sub.trial_end ? new Date(sub.trial_end * 1000) : null,
-      current_period_start: new Date(sub.current_period_start * 1000),
-      current_period_end: new Date(sub.current_period_end * 1000),
-      stripe_subscription_id: sub.id,
-    });
-  },
-
-  'customer.subscription.updated': async (sub) => {
-    await updateSubscription(sub.id, {
-      status: sub.status,
-      current_period_end: new Date(sub.current_period_end * 1000),
-      canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
-    });
-  },
-
-  'customer.subscription.deleted': async (sub) => {
-    await expireSubscription(sub.id);
-    await scheduleStorageCleanup(sub.metadata.organization_id);
-  },
-
-  'invoice.paid': async (invoice) => {
-    await saveInvoice(invoice);
-  },
-
-  'invoice.payment_failed': async (invoice) => {
-    // No grace period - subscription will cancel automatically
-    await sendPaymentFailedEmail(invoice.customer);
-  },
-};
-```
-
-### Monthly Overage Billing
-
-```typescript
-// Runs on 1st of each month at midnight
-cron.schedule('0 0 1 * *', async () => {
-  const lastMonth = getLastMonthString(); // '2025-10'
-
-  // Get all active paid subscriptions
-  const paidOrgs = await db.query(`
-    SELECT os.*, org.storage_used_bytes
-    FROM organization_subscriptions os
-    JOIN organization_storage org ON os.organization_id = org.organization_id
-    WHERE os.status = 'active'
-    AND os.plan_id = (SELECT id FROM subscription_plans WHERE slug = 'paid')
-  `);
-
-  for (const org of paidOrgs.rows) {
-    const usedGB = Math.ceil(org.storage_used_bytes / 1073741824);
-    const overageGB = Math.max(0, usedGB - 5);
-
-    if (overageGB > 0) {
-      const chargeCents = overageGB * 5; // $0.05/GB
-
-      // Create Stripe invoice item
-      const invoiceItem = await stripe.invoiceItems.create({
-        customer: org.stripe_customer_id,
-        amount: chargeCents,
-        currency: 'usd',
-        description: `Storage overage: ${overageGB} GB @ $0.05/GB (${lastMonth})`,
-      });
-
-      // Record overage
-      await db.query(`
-        INSERT INTO storage_overages
-        (organization_id, month_year, peak_storage_bytes, overage_gb, charge_cents, stripe_invoice_item_id)
-        VALUES ($1, $2, $3, $4, $5, $6)
-      `, [org.organization_id, lastMonth, org.storage_used_bytes, overageGB, chargeCents, invoiceItem.id]);
-    }
-  }
+  res.json({ url: session.url });
 });
 ```
+
+### Option 2: Apple IAP (iOS)
+
+```typescript
+// POST /api/billing/apple/verify
+router.post('/apple/verify', authenticateToken, async (req, res) => {
+  const { receiptData, productId } = req.body;
+  const orgId = req.user!.currentOrgId;
+
+  // Verify with Apple
+  const verification = await verifyAppleReceipt(receiptData);
+
+  if (!verification.valid) {
+    return res.status(400).json({ error: 'Invalid receipt' });
+  }
+
+  const plan = await getPlanByAppleProductId(productId);
+
+  // Create/update subscription
+  await upsertSubscription(orgId, {
+    plan_id: plan.id,
+    status: 'active',
+    payment_platform: 'apple',
+    apple_transaction_id: verification.transactionId,
+    current_period_start: verification.purchaseDate,
+    current_period_end: verification.expiresDate,
+  });
+
+  res.json({ success: true, plan: plan.name });
+});
+
+// Apple Server-to-Server notifications endpoint
+router.post('/apple/webhook', async (req, res) => {
+  const notification = req.body;
+
+  switch (notification.notificationType) {
+    case 'DID_RENEW':
+      await renewSubscription(notification);
+      break;
+    case 'DID_FAIL_TO_RENEW':
+    case 'EXPIRED':
+      await expireSubscription(notification);
+      break;
+    case 'DID_CHANGE_RENEWAL_STATUS':
+      await handleRenewalStatusChange(notification);
+      break;
+  }
+
+  res.sendStatus(200);
+});
+```
+
+### Option 3: Google Play (Android)
+
+```typescript
+// POST /api/billing/google/verify
+router.post('/google/verify', authenticateToken, async (req, res) => {
+  const { purchaseToken, productId } = req.body;
+  const orgId = req.user!.currentOrgId;
+
+  // Verify with Google Play
+  const verification = await verifyGooglePurchase(productId, purchaseToken);
+
+  if (!verification.valid) {
+    return res.status(400).json({ error: 'Invalid purchase' });
+  }
+
+  const plan = await getPlanByGoogleProductId(productId);
+
+  // Acknowledge the purchase (required by Google)
+  await acknowledgeGooglePurchase(productId, purchaseToken);
+
+  await upsertSubscription(orgId, {
+    plan_id: plan.id,
+    status: 'active',
+    payment_platform: 'google',
+    google_purchase_token: purchaseToken,
+    current_period_start: new Date(verification.startTimeMillis),
+    current_period_end: new Date(verification.expiryTimeMillis),
+  });
+
+  res.json({ success: true, plan: plan.name });
+});
+
+// Google Real-time Developer Notifications
+router.post('/google/webhook', async (req, res) => {
+  const message = JSON.parse(
+    Buffer.from(req.body.message.data, 'base64').toString()
+  );
+
+  switch (message.subscriptionNotification?.notificationType) {
+    case 2: // SUBSCRIPTION_RENEWED
+      await renewGoogleSubscription(message);
+      break;
+    case 3: // SUBSCRIPTION_CANCELED
+    case 13: // SUBSCRIPTION_EXPIRED
+      await expireGoogleSubscription(message);
+      break;
+  }
+
+  res.sendStatus(200);
+});
+```
+
+---
+
+## Mobile App Implementation
+
+### iOS (Swift)
+
+```swift
+// ProductIDs
+let paidProductId = "com.submitlist.paid.yearly"
+let premiumProductId = "com.submitlist.premium.yearly"
+
+func purchase(productId: String) async throws {
+    let product = try await Product.products(for: [productId]).first!
+    let result = try await product.purchase()
+
+    switch result {
+    case .success(let verification):
+        let transaction = try checkVerified(verification)
+
+        // Send to backend for verification
+        try await API.verifyApplePurchase(
+            receiptData: transaction.receiptData,
+            productId: productId
+        )
+
+        await transaction.finish()
+
+    case .pending:
+        // Transaction pending (e.g., parental approval)
+        break
+    case .userCancelled:
+        break
+    @unknown default:
+        break
+    }
+}
+```
+
+### Android (Kotlin)
+
+```kotlin
+val paidProductId = "com.submitlist.paid.yearly"
+val premiumProductId = "com.submitlist.premium.yearly"
+
+fun purchase(productId: String) {
+    val productList = listOf(
+        QueryProductDetailsParams.Product.newBuilder()
+            .setProductId(productId)
+            .setProductType(BillingClient.ProductType.SUBS)
+            .build()
+    )
+
+    billingClient.queryProductDetailsAsync(params) { _, productDetailsList ->
+        val productDetails = productDetailsList.firstOrNull() ?: return@queryProductDetailsAsync
+
+        val flowParams = BillingFlowParams.newBuilder()
+            .setProductDetailsParamsList(listOf(
+                BillingFlowParams.ProductDetailsParams.newBuilder()
+                    .setProductDetails(productDetails)
+                    .build()
+            ))
+            .build()
+
+        billingClient.launchBillingFlow(activity, flowParams)
+    }
+}
+
+override fun onPurchasesUpdated(result: BillingResult, purchases: List<Purchase>?) {
+    if (result.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
+        for (purchase in purchases) {
+            // Send to backend for verification
+            api.verifyGooglePurchase(
+                purchaseToken = purchase.purchaseToken,
+                productId = purchase.products.first()
+            )
+        }
+    }
+}
+```
+
+---
+
+## Downgrade Flow
+
+### Paid/Premium → Free (Hard Enforcement)
+
+When subscription expires:
+
+1. **Status changes to 'expired'**
+2. **Email sent:** "Your subscription has ended"
+3. **Storage check:**
+   - If storage > 250MB: Block new uploads
+   - Show: "Delete files to continue uploading (Free limit: 250MB)"
+4. **Retention starts:**
+   - Files begin 7-day countdown
+   - Daily cron deletes files older than 7 days
+
+### Premium → Paid (Downgrade)
+
+When user switches plans:
+
+1. **Takes effect at period end**
+2. **Storage check:**
+   - If storage > 5GB: Block new uploads after switch
+   - Show: "Delete files to continue uploading (Paid limit: 5GB)"
+3. **Retention changes:**
+   - Files now subject to 30-day retention
+   - Old files (>30 days) deleted on next cron run
 
 ---
 
@@ -383,212 +482,118 @@ cron.schedule('0 0 1 * *', async () => {
 
 ```typescript
 // GET /api/billing/status
-// Get current billing status
 router.get('/status', authenticateToken, async (req, res) => {
   const orgId = req.user!.currentOrgId;
-
   const subscription = await getSubscription(orgId);
   const storage = await getStorageUsage(orgId);
   const plan = subscription?.plan || await getFreePlan();
 
-  const usedGB = storage.storage_used_bytes / 1073741824;
-  const maxGB = plan.max_storage_bytes / 1073741824;
-  const overageGB = Math.max(0, Math.ceil(usedGB) - 5);
-
   res.json({
-    plan: plan.name,
+    plan: {
+      name: plan.name,
+      slug: plan.slug,
+      price_cents: plan.price_cents,
+      max_storage_bytes: plan.max_storage_bytes,
+      file_retention_days: plan.file_retention_days,
+    },
     status: subscription?.status || 'free',
     trial_ends: subscription?.trial_end,
     period_ends: subscription?.current_period_end,
+    payment_platform: subscription?.payment_platform,
     storage: {
       used_bytes: storage.storage_used_bytes,
-      used_gb: usedGB.toFixed(2),
-      max_gb: maxGB,
-      overage_gb: plan.slug === 'paid' ? overageGB : null,
-      overage_charge: plan.slug === 'paid' ? (overageGB * 0.05).toFixed(2) : null,
+      max_bytes: plan.max_storage_bytes,
+      percentage: (storage.storage_used_bytes / plan.max_storage_bytes) * 100,
     },
-    file_retention_days: plan.file_retention_days,
   });
 });
 
-// POST /api/billing/checkout
-// Start checkout for paid plan (see above)
+// GET /api/billing/plans
+router.get('/plans', async (req, res) => {
+  const plans = await db.query(`
+    SELECT name, slug, price_cents, billing_interval,
+           max_storage_bytes, file_retention_days
+    FROM subscription_plans
+    WHERE is_active = TRUE
+    ORDER BY display_order
+  `);
+  res.json(plans.rows);
+});
 
+// POST /api/billing/checkout (Stripe - web)
+// POST /api/billing/apple/verify (iOS)
+// POST /api/billing/google/verify (Android)
 // POST /api/billing/cancel
-// Cancel subscription (takes effect at period end)
-router.post('/cancel', authenticateToken, requireOrgAdmin, async (req, res) => {
-  const orgId = req.user!.currentOrgId;
-  const subscription = await getSubscription(orgId);
-
-  if (!subscription?.stripe_subscription_id) {
-    return res.status(400).json({ error: 'No active subscription' });
-  }
-
-  await stripe.subscriptions.update(subscription.stripe_subscription_id, {
-    cancel_at_period_end: true,
-  });
-
-  await updateSubscription(subscription.id, {
-    canceled_at: new Date(),
-  });
-
-  res.json({
-    success: true,
-    message: `Subscription will end on ${subscription.current_period_end.toDateString()}`
-  });
-});
-
-// GET /api/billing/invoices
-// Get invoice history
-router.get('/invoices', authenticateToken, requireOrgAdmin, async (req, res) => {
-  const orgId = req.user!.currentOrgId;
-  const invoices = await db.query(`
-    SELECT * FROM subscription_invoices
-    WHERE organization_id = $1
-    ORDER BY invoice_date DESC
-    LIMIT 24
-  `, [orgId]);
-  res.json(invoices.rows);
-});
-
-// POST /api/billing/portal
-// Redirect to Stripe billing portal
-router.post('/portal', authenticateToken, requireOrgAdmin, async (req, res) => {
-  const subscription = await getSubscription(req.user!.currentOrgId);
-
-  const session = await stripe.billingPortal.sessions.create({
-    customer: subscription.stripe_customer_id,
-    return_url: `${process.env.APP_URL}/billing`,
-  });
-
-  res.json({ url: session.url });
-});
+// GET /api/billing/receipts
 ```
 
 ---
 
-## Storage Tracking
+## App Store Setup
 
-### On File Upload
+### Apple App Store Connect
 
-```typescript
-async function trackFileUpload(orgId: number, fileSize: number) {
-  // Check if can upload
-  const storage = await getStorageUsage(orgId);
-  const plan = await getOrgPlan(orgId);
+1. **Create Products:**
+   - `com.submitlist.paid.yearly` - $19.99/year
+   - `com.submitlist.premium.yearly` - $99.99/year
 
-  // Free tier: hard limit at 250MB
-  if (plan.slug === 'free') {
-    if (storage.storage_used_bytes + fileSize > plan.max_storage_bytes) {
-      throw new Error('Storage limit reached. Upgrade to Paid plan for more storage.');
-    }
-  }
-  // Paid tier: warn but allow (will be charged overage)
+2. **Configure Server Notifications:**
+   - URL: `https://api.submitlist.space/billing/apple/webhook`
+   - Version 2 notifications
 
-  // Update storage
-  await db.query(`
-    UPDATE organization_storage
-    SET storage_used_bytes = storage_used_bytes + $1,
-        last_calculated_at = CURRENT_TIMESTAMP
-    WHERE organization_id = $2
-  `, [fileSize, orgId]);
-}
-```
+3. **Enable Subscription Offer Codes** (optional)
 
-### On File Delete
+### Google Play Console
 
-```typescript
-async function trackFileDelete(orgId: number, fileSize: number) {
-  await db.query(`
-    UPDATE organization_storage
-    SET storage_used_bytes = GREATEST(0, storage_used_bytes - $1),
-        last_calculated_at = CURRENT_TIMESTAMP
-    WHERE organization_id = $2
-  `, [fileSize, orgId]);
-}
-```
+1. **Create Subscriptions:**
+   - `com.submitlist.paid.yearly` - $19.99/year
+   - `com.submitlist.premium.yearly` - $99.99/year
 
----
+2. **Configure Real-time Developer Notifications:**
+   - Topic: `projects/submitlist/topics/play-billing`
 
-## Notifications
-
-### Email Triggers
-
-1. **Trial starting** - Welcome + trial info
-2. **7 days before trial ends** - Reminder to keep subscription
-3. **Trial converted to paid** - Confirmation + receipt
-4. **7 days before renewal** - Reminder (annual)
-5. **Payment successful** - Receipt
-6. **Payment failed** - Urgent action needed
-7. **Subscription canceled** - Confirmation + what happens next
-8. **Subscription expired** - Now on free tier + storage warning
-
-### In-App Notifications
-
-- Storage usage > 80% of limit
-- Storage usage > 100% (paid tier overage warning)
-- Free tier: "Files older than 7 days will be deleted"
-- Trial ending in 3 days
-
----
-
-## App Store Billing (If Desired)
-
-**Option A: Stripe only (Recommended)**
-- Works everywhere (web + mobile)
-- Supports overage billing
-- You keep ~95% of revenue
-
-**Option B: IAP for base plan only**
-- Use IAP for $20/year subscription
-- No overage tracking via IAP
-- Convert overage to manual billing or disable for IAP users
-- Apple takes 30% (you keep $14/year)
-
-**Option C: Skip mobile subscription**
-- Show "Subscribe on web" in mobile app
-- Allowed by Apple if digital goods consumed outside app
-- TaskManager is arguably a "business tool" exception
-
-**My recommendation:** Start with Stripe. Add IAP later only if mobile conversion is a problem.
+3. **Set up Cloud Pub/Sub** to forward to webhook
 
 ---
 
 ## Implementation Checklist
 
-### Phase 1: Database & Stripe Setup
-- [ ] Create database tables
-- [ ] Set up Stripe account
-- [ ] Create product and price in Stripe
-- [ ] Configure webhook endpoint
+### Phase 1: Database
+- [ ] Create/migrate subscription tables
+- [ ] Seed plan data
+- [ ] Add storage tracking
 
-### Phase 2: Core Billing
+### Phase 2: Stripe (Web)
+- [ ] Create Stripe products/prices
 - [ ] Checkout flow
 - [ ] Webhook handlers
-- [ ] Subscription status tracking
-- [ ] Storage tracking
+- [ ] Billing portal
 
-### Phase 3: Enforcement
-- [ ] Free tier 250MB limit
-- [ ] Free tier 7-day auto-delete cron
-- [ ] Overage calculation cron
-- [ ] Downgrade enforcement
+### Phase 3: Storage Enforcement
+- [ ] Upload limit checking
+- [ ] Auto-delete cron job
+- [ ] Storage recalculation
 
-### Phase 4: UI
-- [ ] Billing status page
-- [ ] Checkout button
-- [ ] Storage usage meter
-- [ ] Cancel subscription
-- [ ] Invoice history
+### Phase 4: Apple IAP (iOS)
+- [ ] Create App Store products
+- [ ] StoreKit 2 integration
+- [ ] Receipt verification endpoint
+- [ ] Server notifications
+
+### Phase 5: Google Play (Android)
+- [ ] Create Play Store subscriptions
+- [ ] Billing Library integration
+- [ ] Purchase verification endpoint
+- [ ] RTDN webhook
+
+### Phase 6: UI
+- [ ] Plans comparison page
+- [ ] Storage meter
+- [ ] Upgrade prompts
+- [ ] Receipt history
 
 ---
 
 ## RBAC Note
 
-Per your direction: **Current RBAC is sufficient.** The `RBAC_DESIGN.md` document is preserved for future enhancements if needed:
-- Custom roles
-- Observer permissions
-- Team-based access
-- Granular permissions
-
-For now, the existing member/admin/super_admin roles work fine for both free and paid tiers.
+Current RBAC (member/admin/super_admin) is sufficient. See `RBAC_DESIGN.md` for future enhancements if needed.
