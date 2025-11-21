@@ -5,6 +5,13 @@ import { Organization } from '../types';
 import Layout from '../components/Layout';
 import './OrganizationsPage.css';
 
+interface PublicOrganization {
+  id: number;
+  name: string;
+  description?: string;
+  member_count: number;
+}
+
 const OrganizationsPage: React.FC = () => {
   const navigate = useNavigate();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -12,6 +19,14 @@ const OrganizationsPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
   const modalRef = useRef<HTMLDivElement>(null);
+
+  // Join organization state
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [availableOrgs, setAvailableOrgs] = useState<PublicOrganization[]>([]);
+  const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
+  const [joinMessage, setJoinMessage] = useState('');
+  const [loadingAvailableOrgs, setLoadingAvailableOrgs] = useState(false);
+  const joinModalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadOrganizations();
@@ -101,17 +116,69 @@ const OrganizationsPage: React.FC = () => {
     }
   };
 
+  const loadAvailableOrganizations = async () => {
+    setLoadingAvailableOrgs(true);
+    try {
+      const response = await organizationAPI.getPublicOrganizations();
+      const publicOrgs: PublicOrganization[] = response.data.organizations || [];
+      // Filter out organizations the user is already a member of
+      const memberOrgIds = new Set(organizations.map(org => org.id));
+      const available = publicOrgs.filter(org => !memberOrgIds.has(org.id));
+      setAvailableOrgs(available);
+    } catch (error: any) {
+      console.error('Failed to load available organizations:', error);
+      setAvailableOrgs([]);
+    } finally {
+      setLoadingAvailableOrgs(false);
+    }
+  };
+
+  const openJoinModal = () => {
+    setShowJoinModal(true);
+    loadAvailableOrganizations();
+  };
+
+  const closeJoinModal = () => {
+    setShowJoinModal(false);
+    setSelectedOrgId(null);
+    setJoinMessage('');
+  };
+
+  const handleJoinRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrgId) {
+      alert('Please select an organization to join');
+      return;
+    }
+
+    try {
+      await organizationAPI.createJoinRequest(selectedOrgId, joinMessage);
+      alert('Join request sent successfully! You will be notified when it is reviewed.');
+      closeJoinModal();
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to send join request');
+    }
+  };
+
   return (
     <Layout>
       <div className="organizations-page">
         <div className="page-header">
           <h1>Organizations</h1>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowCreateModal(true)}
-          >
-            + Create Organization
-          </button>
+          <div className="header-actions">
+            <button
+              className="btn btn-secondary"
+              onClick={openJoinModal}
+            >
+              Join Organization
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowCreateModal(true)}
+            >
+              + Create Organization
+            </button>
+          </div>
         </div>
 
         {showCreateModal && (
@@ -151,6 +218,79 @@ const OrganizationsPage: React.FC = () => {
                   </button>
                   <button type="submit" className="btn btn-primary">
                     Create
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {showJoinModal && (
+          <div
+            className="modal-overlay"
+            onClick={closeJoinModal}
+            aria-hidden="true"
+          >
+            <div
+              ref={joinModalRef}
+              className="modal"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="join-modal-title"
+            >
+              <h2 id="join-modal-title">Join Organization</h2>
+              <form onSubmit={handleJoinRequest}>
+                <div className="input-group">
+                  <label>Select Organization</label>
+                  {loadingAvailableOrgs ? (
+                    <select disabled>
+                      <option>Loading...</option>
+                    </select>
+                  ) : availableOrgs.length === 0 ? (
+                    <select disabled>
+                      <option>N/A - No organizations available to join</option>
+                    </select>
+                  ) : (
+                    <select
+                      value={selectedOrgId || ''}
+                      onChange={(e) => setSelectedOrgId(e.target.value ? Number(e.target.value) : null)}
+                      autoFocus
+                    >
+                      <option value="">Select an organization...</option>
+                      {availableOrgs.map((org) => (
+                        <option key={org.id} value={org.id}>
+                          {org.name} ({org.member_count} members)
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                {availableOrgs.length > 0 && selectedOrgId && (
+                  <div className="input-group">
+                    <label>Message (optional)</label>
+                    <textarea
+                      value={joinMessage}
+                      onChange={(e) => setJoinMessage(e.target.value)}
+                      placeholder="Why do you want to join this organization?"
+                      rows={3}
+                    />
+                  </div>
+                )}
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={closeJoinModal}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={!selectedOrgId || availableOrgs.length === 0}
+                  >
+                    Request to Join
                   </button>
                 </div>
               </form>

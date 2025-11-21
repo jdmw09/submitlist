@@ -103,6 +103,43 @@
   flex: 1;
 }
 
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.modal select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+.modal select:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+  color: #999;
+}
+
+.modal textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.modal textarea:focus,
+.modal select:focus {
+  outline: none;
+  border-color: #007AFF;
+}
+
 @media (max-width: 768px) {
   .orgs-grid {
     grid-template-columns: 1fr;
