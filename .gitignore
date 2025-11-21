@@ -25,7 +25,9 @@ Thumbs.db
 
 # Uploads
 uploads/*
+backend/uploads/*
 !uploads/.gitkeep
+!backend/uploads/.gitkeep
 
 # Database
 *.db

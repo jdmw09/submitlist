@@ -38,6 +38,7 @@ services:
       JWT_EXPIRES_IN: 7d
       MAX_FILE_SIZE: 10485760
       APP_URL: http://localhost:3001
+      BILLING_ENABLED: "false"
     ports:
       - "3000:3000"
     volumes:
