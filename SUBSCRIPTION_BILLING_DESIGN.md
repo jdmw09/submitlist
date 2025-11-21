@@ -76,25 +76,191 @@ Three-tier subscription model with fixed pricing, compatible with both Stripe an
 
 ---
 
+## Member-Subscription Relationship
+
+### Subscription Inheritance Model
+
+```
+Subscription ──► Organization ──► Members
+   (Paid)           (Pool)        (Access)
+```
+
+**How it works:**
+1. Admin subscribes → Organization gets plan
+2. Members join org → Inherit org's plan benefits
+3. Member uploads → Counts against org's shared storage pool
+4. Member leaves → Their files/storage stays with org
+
+### Database Relationships
+
+```
+users
+  └── organization_members (user_id, org_id, role)
+        └── organizations
+              ├── organization_subscriptions (plan_id, status)
+              │     └── subscription_plans (storage, retention)
+              ├── organization_storage (total used)
+              └── user_storage_contributions (per-user breakdown)
+```
+
+### Multi-Org Users
+
+A user can belong to multiple organizations with different plans:
+
+| Organization | Plan | User's Role | Storage Pool |
+|--------------|------|-------------|--------------|
+| Acme Corp | Premium | member | 100 GB shared |
+| Side Project | Free | admin | 250 MB shared |
+| Client Work | Paid | member | 5 GB shared |
+
+Each org context = different storage pool and limits.
+
+### Billing Permissions
+
+| Action | Admin | Member |
+|--------|-------|--------|
+| View subscription status | ✅ | ✅ (read-only) |
+| View org storage usage | ✅ | ✅ (read-only) |
+| View per-user breakdown | ✅ | ❌ |
+| Upgrade/downgrade plan | ✅ | ❌ |
+| Manage payment method | ✅ | ❌ |
+| View invoices | ✅ | ❌ |
+| Upload files | ✅ | ✅ |
+| Delete own files | ✅ | ✅ |
+| Delete others' files | ✅ | ❌ |
+
+### Key Scenarios
+
+**Member joins org:**
+```typescript
+async function addMemberToOrg(orgId: number, userId: number) {
+  // Add to org_members - they inherit subscription automatically
+  await db.query(`
+    INSERT INTO organization_members (organization_id, user_id, role)
+    VALUES ($1, $2, 'member')
+  `, [orgId, userId]);
+
+  // Initialize their contribution tracker
+  await db.query(`
+    INSERT INTO user_storage_contributions (organization_id, user_id)
+    VALUES ($1, $2)
+    ON CONFLICT DO NOTHING
+  `, [orgId, userId]);
+}
+```
+
+**Member leaves org:**
+```typescript
+async function removeMemberFromOrg(orgId: number, userId: number) {
+  // Remove membership
+  await db.query(`
+    DELETE FROM organization_members
+    WHERE organization_id = $1 AND user_id = $2
+  `, [orgId, userId]);
+
+  // Their files/completions stay with the org
+  // Storage contribution record kept for historical tracking
+}
+```
+
+**Admin leaves org:**
+```typescript
+async function removeAdminFromOrg(orgId: number, userId: number) {
+  // Check if last admin
+  const admins = await getOrgAdmins(orgId);
+
+  if (admins.length === 1) {
+    throw new Error('Cannot remove last admin. Transfer ownership first.');
+  }
+
+  // Subscription stays with org (tied to org, not user)
+  await removeMemberFromOrg(orgId, userId);
+}
+```
+
+**Subscription expires:**
+```typescript
+// All members affected equally - org downgrades to Free
+async function handleSubscriptionExpired(orgId: number) {
+  // Org moves to free tier limits
+  // All members now subject to 250MB limit, 7-day retention
+  // No individual member billing - it's org-level
+}
+```
+
+---
+
 ## Storage & Retention Enforcement
 
 ### Hard Storage Limits
 
 ```typescript
-async function canUpload(orgId: number, fileSize: number): Promise<boolean> {
+async function canUpload(
+  orgId: number,
+  userId: number,
+  fileSize: number
+): Promise<boolean> {
   const storage = await getStorageUsage(orgId);
   const plan = await getOrgPlan(orgId);
 
   if (storage.used_bytes + fileSize > plan.max_storage_bytes) {
-    const planNames = { free: 'Free', paid: 'Paid', premium: 'Premium' };
     const upgradeTo = plan.slug === 'free' ? 'Paid' : 'Premium';
 
     throw new StorageLimitError(
-      `Storage limit reached (${formatBytes(plan.max_storage_bytes)}). ` +
+      `Organization storage limit reached (${formatBytes(plan.max_storage_bytes)}). ` +
       `Upgrade to ${upgradeTo} for more storage.`
     );
   }
+
   return true;
+}
+
+// Track both org total and per-user contribution
+async function trackFileUpload(
+  orgId: number,
+  userId: number,
+  fileSize: number
+) {
+  // Update org total
+  await db.query(`
+    UPDATE organization_storage
+    SET storage_used_bytes = storage_used_bytes + $1,
+        last_calculated_at = CURRENT_TIMESTAMP
+    WHERE organization_id = $2
+  `, [fileSize, orgId]);
+
+  // Update user's contribution
+  await db.query(`
+    INSERT INTO user_storage_contributions (organization_id, user_id, storage_bytes, file_count, last_upload_at)
+    VALUES ($1, $2, $3, 1, CURRENT_TIMESTAMP)
+    ON CONFLICT (organization_id, user_id)
+    DO UPDATE SET
+      storage_bytes = user_storage_contributions.storage_bytes + $3,
+      file_count = user_storage_contributions.file_count + 1,
+      last_upload_at = CURRENT_TIMESTAMP
+  `, [orgId, userId, fileSize]);
+}
+
+async function trackFileDelete(
+  orgId: number,
+  userId: number,
+  fileSize: number
+) {
+  // Update org total
+  await db.query(`
+    UPDATE organization_storage
+    SET storage_used_bytes = GREATEST(0, storage_used_bytes - $1),
+        last_calculated_at = CURRENT_TIMESTAMP
+    WHERE organization_id = $2
+  `, [fileSize, orgId]);
+
+  // Update user's contribution
+  await db.query(`
+    UPDATE user_storage_contributions
+    SET storage_bytes = GREATEST(0, storage_bytes - $1),
+        file_count = GREATEST(0, file_count - 1)
+    WHERE organization_id = $2 AND user_id = $3
+  `, [fileSize, orgId, userId]);
 }
 ```
 
@@ -213,9 +379,31 @@ CREATE TABLE organization_storage (
   storage_used_bytes BIGINT DEFAULT 0,
   last_calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_org_storage_org ON organization_storage(organization_id);
 ```
 
-### 4. `subscription_receipts` Table
+### 4. `user_storage_contributions` Table
+
+Tracks per-user storage usage within each organization for admin visibility.
+
+```sql
+CREATE TABLE user_storage_contributions (
+  id SERIAL PRIMARY KEY,
+  organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  storage_bytes BIGINT DEFAULT 0,
+  file_count INTEGER DEFAULT 0,
+  last_upload_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(organization_id, user_id)
+);
+
+CREATE INDEX idx_user_storage_org ON user_storage_contributions(organization_id);
+CREATE INDEX idx_user_storage_user ON user_storage_contributions(user_id);
+```
+
+### 5. `subscription_receipts` Table
 
 ```sql
 CREATE TABLE subscription_receipts (
@@ -525,6 +713,52 @@ router.get('/plans', async (req, res) => {
 // POST /api/billing/google/verify (Android)
 // POST /api/billing/cancel
 // GET /api/billing/receipts
+
+// GET /api/billing/storage-breakdown (Admin only)
+// Returns per-user storage contributions
+router.get('/storage-breakdown',
+  authenticateToken,
+  requireOrgAdmin,
+  async (req, res) => {
+    const orgId = req.user!.currentOrgId;
+
+    const breakdown = await db.query(`
+      SELECT
+        u.id as user_id,
+        u.name as user_name,
+        u.email,
+        usc.storage_bytes,
+        usc.file_count,
+        usc.last_upload_at,
+        ROUND(usc.storage_bytes * 100.0 / NULLIF(os.storage_used_bytes, 0), 1) as percentage
+      FROM user_storage_contributions usc
+      JOIN users u ON usc.user_id = u.id
+      JOIN organization_storage os ON usc.organization_id = os.organization_id
+      WHERE usc.organization_id = $1
+      ORDER BY usc.storage_bytes DESC
+    `, [orgId]);
+
+    const orgStorage = await getStorageUsage(orgId);
+    const plan = await getOrgPlan(orgId);
+
+    res.json({
+      total: {
+        used_bytes: orgStorage.storage_used_bytes,
+        max_bytes: plan.max_storage_bytes,
+        percentage: (orgStorage.storage_used_bytes / plan.max_storage_bytes) * 100,
+      },
+      by_user: breakdown.rows.map(row => ({
+        user_id: row.user_id,
+        user_name: row.user_name,
+        email: row.email,
+        storage_bytes: row.storage_bytes,
+        file_count: row.file_count,
+        last_upload_at: row.last_upload_at,
+        percentage: parseFloat(row.percentage) || 0,
+      })),
+    });
+  }
+);
 ```
 
 ---
@@ -588,9 +822,76 @@ router.get('/plans', async (req, res) => {
 
 ### Phase 6: UI
 - [ ] Plans comparison page
-- [ ] Storage meter
+- [ ] Storage meter with per-user breakdown
 - [ ] Upgrade prompts
 - [ ] Receipt history
+
+---
+
+## UI Examples
+
+### Member View (Non-Admin)
+
+```
+Settings > Organization
+
+┌─────────────────────────────────────────────────┐
+│  Plan: Paid ($20/year)                          │
+│                                                 │
+│  Organization Storage                           │
+│  ████████████░░░░░░░░  3.2 GB / 5 GB (64%)     │
+│                                                 │
+│  Your contribution: 1.1 GB                      │
+│  File retention: 30 days                        │
+│                                                 │
+│  [Contact admin to upgrade]                     │
+└─────────────────────────────────────────────────┘
+```
+
+### Admin View
+
+```
+Settings > Billing
+
+┌─────────────────────────────────────────────────┐
+│  Plan: Paid ($20/year)           [Change Plan]  │
+│  Status: Active                                 │
+│  Renews: Dec 21, 2025                          │
+│                                                 │
+│  Organization Storage                           │
+│  ████████████░░░░░░░░  3.2 GB / 5 GB (64%)     │
+│                                                 │
+│  Top Contributors:                              │
+│  ┌─────────────────────────────────────────┐   │
+│  │  John Smith        1.8 GB (56%)    142 │   │
+│  │  ████████████████░░░░░░░░░░░░░░░ files │   │
+│  ├─────────────────────────────────────────┤   │
+│  │  Sarah Johnson     1.1 GB (34%)     89 │   │
+│  │  ██████████░░░░░░░░░░░░░░░░░░░░░ files │   │
+│  ├─────────────────────────────────────────┤   │
+│  │  You (Admin)       0.3 GB (10%)     23 │   │
+│  │  ███░░░░░░░░░░░░░░░░░░░░░░░░░░░░ files │   │
+│  └─────────────────────────────────────────┘   │
+│                                                 │
+│  [Manage Payment]  [View Invoices]  [Cancel]    │
+└─────────────────────────────────────────────────┘
+```
+
+### Storage Warning (Near Limit)
+
+```
+┌─────────────────────────────────────────────────┐
+│  ⚠️  Storage Almost Full                        │
+│                                                 │
+│  ██████████████████░░  4.7 GB / 5 GB (94%)     │
+│                                                 │
+│  You have 300 MB remaining.                     │
+│                                                 │
+│  Options:                                       │
+│  • Delete old files to free up space           │
+│  • [Upgrade to Premium - 100 GB]               │
+└─────────────────────────────────────────────────┘
+```
 
 ---
 
