@@ -122,3 +122,104 @@ export interface AdminAuditLog {
   user_agent?: string;
   created_at: Date;
 }
+
+// Billing Types
+export interface SubscriptionPlan {
+  id: number;
+  name: string;
+  slug: 'free' | 'paid' | 'premium';
+  price_cents: number;
+  billing_interval: string | null;
+  max_storage_bytes: number;
+  file_retention_days: number | null;
+  stripe_price_id?: string;
+  apple_product_id?: string;
+  google_product_id?: string;
+  display_order: number;
+  is_active: boolean;
+  created_at: Date;
+}
+
+export interface OrganizationSubscription {
+  id: number;
+  organization_id: number;
+  plan_id: number;
+  status: 'free' | 'trialing' | 'active' | 'canceled' | 'expired';
+  trial_end?: Date;
+  current_period_start?: Date;
+  current_period_end?: Date;
+  canceled_at?: Date;
+  payment_platform?: 'stripe' | 'apple' | 'google';
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
+  apple_transaction_id?: string;
+  google_purchase_token?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface OrganizationStorage {
+  id: number;
+  organization_id: number;
+  storage_used_bytes: number;
+  last_calculated_at: Date;
+}
+
+export interface UserStorageContribution {
+  id: number;
+  organization_id: number;
+  user_id: number;
+  storage_bytes: number;
+  file_count: number;
+  last_upload_at?: Date;
+  created_at: Date;
+}
+
+export interface SubscriptionReceipt {
+  id: number;
+  organization_id: number;
+  payment_platform: 'stripe' | 'apple' | 'google';
+  stripe_invoice_id?: string;
+  apple_transaction_id?: string;
+  google_order_id?: string;
+  amount_cents: number;
+  currency: string;
+  receipt_date: Date;
+  created_at: Date;
+}
+
+export interface BillingStatus {
+  plan: {
+    name: string;
+    slug: string;
+    price_cents: number;
+    max_storage_bytes: number;
+    file_retention_days: number | null;
+  };
+  status: string;
+  trial_ends?: Date;
+  period_ends?: Date;
+  payment_platform?: string;
+  storage: {
+    used_bytes: number;
+    max_bytes: number;
+    percentage: number;
+  };
+}
+
+export interface StorageBreakdown {
+  total: {
+    used_bytes: number;
+    max_bytes: number;
+    percentage: number;
+  };
+  by_user: Array<{
+    user_id: number;
+    user_name: string;
+    email: string;
+    storage_bytes: number;
+    file_count: number;
+    last_upload_at?: Date;
+    percentage: number;
+  }>;
+}

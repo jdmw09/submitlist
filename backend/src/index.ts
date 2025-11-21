@@ -10,7 +10,9 @@ import groupRoutes from './routes/groupRoutes';
 import taskRoutes from './routes/taskRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import processingRoutes from './routes/processingRoutes';
+import billingRoutes from './routes/billingRoutes';
 import { startScheduledTaskService } from './services/scheduledTaskService';
+import { startFileRetentionService } from './services/fileRetentionService';
 
 dotenv.config();
 
@@ -34,6 +36,7 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/processing', processingRoutes);
+app.use('/api/billing', billingRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -51,6 +54,7 @@ app.get('/', (req, res) => {
       groups: '/api/groups',
       tasks: '/api/tasks',
       notifications: '/api/notifications',
+      billing: '/api/billing',
     },
   });
 });
@@ -74,6 +78,9 @@ app.listen(PORT, () => {
 
   // Start scheduled task service
   startScheduledTaskService();
+
+  // Start file retention service (for billing-based file cleanup)
+  startFileRetentionService();
 });
 
 export default app;

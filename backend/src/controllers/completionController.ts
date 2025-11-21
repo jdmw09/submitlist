@@ -2,9 +2,11 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { query } from '../config/database';
 import path from 'path';
+import fs from 'fs';
 import { compressImage, shouldCompressImage } from '../utils/imageCompressor';
 import { shouldCompressVideo } from '../utils/videoCompressor';
 import { processVideoInBackground } from '../services/processingJobService';
+import { isBillingEnabled, canUploadFile, trackFileUpload, trackFileDelete } from '../services/billingService';
 
 export const addCompletion = async (req: AuthRequest, res: Response) => {
   try {
@@ -34,10 +36,33 @@ export const addCompletion = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: 'You do not have access to this task' });
     }
 
+    // Check storage limit if billing is enabled and files are uploaded
+    const files = req.files as Express.Multer.File[];
+    let totalFileSize = 0;
+
+    if (files && files.length > 0 && isBillingEnabled()) {
+      totalFileSize = files.reduce((sum, file) => sum + file.size, 0);
+      const uploadCheck = await canUploadFile(task.organization_id, totalFileSize);
+
+      if (!uploadCheck.allowed) {
+        // Delete uploaded files since we can't accept them
+        for (const file of files) {
+          const filePath = path.join(__dirname, '../../uploads', file.filename);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        }
+        return res.status(402).json({
+          error: 'Storage limit exceeded',
+          message: uploadCheck.message,
+          upgrade_required: true,
+        });
+      }
+    }
+
     // Handle file uploads (multiple files supported)
     let filePath = null;
     const videoJobIds: string[] = [];
-    const files = req.files as Express.Multer.File[];
 
     if (files && files.length > 0) {
       const processedFilePaths: string[] = [];
@@ -88,13 +113,18 @@ export const addCompletion = async (req: AuthRequest, res: Response) => {
 
     // Create completion
     const completionResult = await query(
-      `INSERT INTO task_completions (task_id, requirement_id, user_id, completion_type, text_content, file_path)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO task_completions (task_id, requirement_id, user_id, completion_type, text_content, file_path, file_size_bytes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [taskId, requirementId, userId, finalCompletionType, textContent, filePath]
+      [taskId, requirementId, userId, finalCompletionType, textContent, filePath, totalFileSize]
     );
 
     const completionId = completionResult.rows[0].id;
+
+    // Track file upload for billing if files were uploaded
+    if (totalFileSize > 0 && isBillingEnabled()) {
+      await trackFileUpload(task.organization_id, userId, totalFileSize);
+    }
 
     // Start background video compression for video files
     if (files && files.length > 0) {
@@ -250,6 +280,12 @@ export const deleteCompletion = async (req: AuthRequest, res: Response) => {
 
     if (!isAdmin && !isOwner) {
       return res.status(403).json({ error: 'Only admins or completion owners can delete completions' });
+    }
+
+    // Track file deletion for billing if file was attached
+    const fileSize = completion.file_size_bytes || 0;
+    if (fileSize > 0 && isBillingEnabled()) {
+      await trackFileDelete(completion.organization_id, completion.user_id, fileSize);
     }
 
     // Delete completion
