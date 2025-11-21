@@ -6,7 +6,7 @@ interface ButtonProps {
   title: string;
   onPress: () => void;
   loading?: boolean;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: 'primary' | 'secondary' | 'danger' | 'text';
   disabled?: boolean;
 }
 
@@ -20,7 +20,7 @@ export const Button: React.FC<ButtonProps> = ({
   const { colors } = useTheme();
 
   const getBackgroundColor = () => {
-    if (variant === 'secondary') return 'transparent';
+    if (variant === 'secondary' || variant === 'text') return 'transparent';
     if (variant === 'danger') return colors.error;
     return colors.buttonPrimaryBg;
   };
@@ -31,7 +31,7 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const getTextColor = () => {
-    if (variant === 'secondary') return colors.primary;
+    if (variant === 'secondary' || variant === 'text') return colors.primary;
     if (variant === 'danger') return colors.buttonPrimaryText;
     return colors.buttonPrimaryText;
   };

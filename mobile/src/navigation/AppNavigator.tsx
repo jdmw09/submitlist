@@ -7,6 +7,8 @@ import { useAuth } from '../contexts/AuthContext';
 // Screens
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import OrganizationsScreen from '../screens/OrganizationsScreen';
 import OrganizationSettingsScreen from '../screens/OrganizationSettingsScreen';
@@ -95,6 +97,8 @@ const AuthStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Register" component={RegisterScreen} />
+    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+    <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     <Stack.Screen name="Onboarding" component={OnboardingScreen} />
   </Stack.Navigator>
 );

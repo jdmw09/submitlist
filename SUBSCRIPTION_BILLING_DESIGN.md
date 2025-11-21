@@ -1,5 +1,8 @@
 # Subscription Billing System Design
 
+**Status**: ✅ IMPLEMENTED (v2.1.0 - November 21, 2025)
+**Deployed**: Yes (BILLING_ENABLED=false for now)
+
 ## Overview
 
 Three-tier subscription model with fixed pricing, compatible with both Stripe and App Store IAP.
@@ -792,39 +795,42 @@ router.get('/storage-breakdown',
 
 ## Implementation Checklist
 
-### Phase 1: Database
-- [ ] Create/migrate subscription tables
-- [ ] Seed plan data
-- [ ] Add storage tracking
+### Phase 1: Database ✅ COMPLETE
+- [x] Create/migrate subscription tables (005_billing_subscriptions.sql)
+- [x] Seed plan data (Free/Paid/Premium)
+- [x] Add storage tracking (organization_storage, user_storage_contributions)
 
-### Phase 2: Stripe (Web)
+### Phase 2: Stripe (Web) ⏳ PENDING
 - [ ] Create Stripe products/prices
 - [ ] Checkout flow
 - [ ] Webhook handlers
 - [ ] Billing portal
 
-### Phase 3: Storage Enforcement
-- [ ] Upload limit checking
-- [ ] Auto-delete cron job
-- [ ] Storage recalculation
+### Phase 3: Storage Enforcement ✅ COMPLETE
+- [x] Upload limit checking (checkStorageLimit middleware)
+- [x] Auto-delete cron job (fileRetentionService.ts)
+- [x] Storage recalculation (recalculateStorage endpoint)
+- [x] Storage tracking on upload/delete (completionController.ts)
 
-### Phase 4: Apple IAP (iOS)
+### Phase 4: Apple IAP (iOS) ⏳ STUB READY
 - [ ] Create App Store products
-- [ ] StoreKit 2 integration
-- [ ] Receipt verification endpoint
-- [ ] Server notifications
+- [ ] StoreKit 2 integration (mobile)
+- [x] Receipt verification endpoint (stub - iapController.ts)
+- [x] Server notifications webhook (stub - iapRoutes.ts)
 
-### Phase 5: Google Play (Android)
+### Phase 5: Google Play (Android) ⏳ STUB READY
 - [ ] Create Play Store subscriptions
-- [ ] Billing Library integration
-- [ ] Purchase verification endpoint
-- [ ] RTDN webhook
+- [ ] Billing Library integration (mobile)
+- [x] Purchase verification endpoint (stub - iapController.ts)
+- [x] RTDN webhook (stub - iapRoutes.ts)
 
-### Phase 6: UI
+### Phase 6: UI ⏳ PENDING
 - [ ] Plans comparison page
 - [ ] Storage meter with per-user breakdown
 - [ ] Upgrade prompts
 - [ ] Receipt history
+
+**See `IAP_IMPLEMENTATION_PLAN.md` for detailed mobile implementation guide.**
 
 ---
 

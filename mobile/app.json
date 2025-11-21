@@ -2,7 +2,7 @@
   "expo": {
     "name": "Task Manager",
     "slug": "taskmanager",
-    "version": "1.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,6 +14,9 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "extra": {
+      "apiUrl": "https://submitlist.space/api"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.taskmanager.app",

@@ -1,7 +1,12 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-const API_URL = 'http://localhost:3000/api';
+// API URL configuration:
+// - For development: http://localhost:3000/api (iOS simulator)
+// - For development: http://10.0.2.2:3000/api (Android emulator)
+// - For production: https://submitlist.space/api
+const API_URL = Constants.expoConfig?.extra?.apiUrl || 'https://submitlist.space/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -28,6 +33,21 @@ export const authAPI = {
     api.post('/auth/login', { email, password }),
 
   getProfile: () => api.get('/auth/profile'),
+
+  // Email verification
+  resendVerificationEmail: () => api.post('/auth/resend-verification'),
+
+  verifyEmail: (token: string) => api.get(`/auth/verify-email/${token}`),
+
+  getVerificationStatus: () => api.get('/auth/verification-status'),
+
+  // Password reset
+  forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+
+  validateResetToken: (token: string) => api.get(`/auth/validate-reset-token/${token}`),
+
+  resetPassword: (token: string, newPassword: string) =>
+    api.post('/auth/reset-password', { token, newPassword }),
 };
 
 // Organization API
@@ -145,6 +165,45 @@ export const notificationAPI = {
 
   delete: (notificationId: number) =>
     api.delete(`/notifications/${notificationId}`),
+};
+
+// Billing API
+export const billingAPI = {
+  // Get billing status for current organization
+  getStatus: (organizationId: number) =>
+    api.get('/billing/status', { params: { organizationId } }),
+
+  // Get available subscription plans
+  getPlans: () => api.get('/billing/plans'),
+
+  // Get storage breakdown by user (admin only)
+  getStorageBreakdown: (organizationId: number) =>
+    api.get('/billing/storage/breakdown', { params: { organizationId } }),
+
+  // Check if upload is allowed
+  checkUploadAllowed: (organizationId: number, fileSize: number) =>
+    api.post('/billing/storage/check-upload', { organizationId, fileSize }),
+};
+
+// In-App Purchase API
+export const iapAPI = {
+  // Verify Apple App Store receipt
+  verifyAppleReceipt: (transactionId: string, productId: string, receipt?: string) =>
+    api.post('/iap/verify/apple', { transactionId, productId, receipt }),
+
+  // Verify Google Play purchase
+  verifyGooglePurchase: (purchaseToken: string, productId: string) =>
+    api.post('/iap/verify/google', { purchaseToken, productId }),
+
+  // Restore purchases from app stores
+  restorePurchases: (platform: 'apple' | 'google', receipts?: any[]) =>
+    api.post('/iap/restore', { platform, receipts }),
+
+  // Get subscription management URL
+  getManagementUrl: () => api.get('/iap/management-url'),
+
+  // Get detailed subscription info
+  getSubscriptionDetails: () => api.get('/iap/subscription'),
 };
 
 export default api;

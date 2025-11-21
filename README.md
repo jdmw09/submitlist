@@ -17,6 +17,16 @@ A full-stack task management system with scheduled tasks, team collaboration, an
 - **WCAG 2.1 Level AA accessibility** (93% compliant)
 - Dark mode support (web and mobile)
 
+### Subscription Billing (NEW - v2.1.0)
+- Three-tier subscription model:
+  - **Free**: 250MB storage, 7-day file retention
+  - **Paid**: $20/year, 5GB storage, 30-day file retention
+  - **Premium**: $99/year, 100GB storage, unlimited retention
+- Organization-level storage pooling with per-user tracking
+- Automatic file retention cleanup (cron-based)
+- Feature flag support (BILLING_ENABLED)
+- IAP-ready endpoints for Apple App Store and Google Play
+
 ### Technical Stack
 
 **Backend:**
@@ -245,6 +255,19 @@ After seeding the database, you can login with:
 - `GET /api/processing/jobs/:jobId` - Check video compression status
 - `GET /api/processing/jobs/stats` - System statistics
 
+### Billing
+- `GET /api/billing/status` - Get billing/storage status
+- `GET /api/billing/plans` - List subscription plans
+- `GET /api/billing/storage/breakdown` - Per-user storage breakdown (admin)
+- `POST /api/billing/storage/check-upload` - Check if upload allowed
+
+### In-App Purchases
+- `POST /api/iap/verify/apple` - Verify Apple receipt
+- `POST /api/iap/verify/google` - Verify Google purchase
+- `POST /api/iap/restore` - Restore purchases
+- `GET /api/iap/management-url` - Get subscription management URL
+- `GET /api/iap/subscription` - Get subscription details
+
 ## Usage Guide
 
 ### Creating Your First Task
@@ -389,6 +412,9 @@ Comprehensive guides available:
 - **[PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md)** - Complete production deployment guide (submitlist.space)
 - **[DEPLOYMENT_OPTIONS.md](DEPLOYMENT_OPTIONS.md)** - Production deployment options and guides
 - **[DIGITALOCEAN_DEPLOYMENT.md](DIGITALOCEAN_DEPLOYMENT.md)** - Detailed DigitalOcean deployment
+- **[DEPLOYMENT_COMPLETE.md](DEPLOYMENT_COMPLETE.md)** - Complete deployment commands reference
+- **[SUBSCRIPTION_BILLING_DESIGN.md](SUBSCRIPTION_BILLING_DESIGN.md)** - Billing system design
+- **[IAP_IMPLEMENTATION_PLAN.md](IAP_IMPLEMENTATION_PLAN.md)** - In-App Purchase integration guide
 - **[UI_DESIGN_REVIEW.md](docs/UI_DESIGN_REVIEW.md)** - Design specifications
 - **[AUTH_SERVICE_ARCHITECTURE.md](AUTH_SERVICE_ARCHITECTURE.md)** - Auth service evaluation
 

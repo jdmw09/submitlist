@@ -70,6 +70,12 @@ const LoginScreen = ({ navigation }: any) => {
           <Button title="Sign In" onPress={handleLogin} loading={loading} />
 
           <Button
+            title="Forgot Password?"
+            onPress={() => navigation.navigate('ForgotPassword')}
+            variant="text"
+          />
+
+          <Button
             title="Create Account"
             onPress={() => navigation.navigate('Register')}
             variant="secondary"

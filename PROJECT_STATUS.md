@@ -1,6 +1,6 @@
 # TaskManager - Project Status
 
-**Last Updated**: November 20, 2025
+**Last Updated**: November 21, 2025
 
 ## Project Overview
 
@@ -95,6 +95,50 @@ TaskManager is a full-stack task management application with web and mobile inte
   - Push notification service
   - Notification handling
 
+### Phase 5: Subscription Billing System ✅
+- [x] Three-tier subscription model (Free/Paid/Premium)
+  - Free: 250MB storage, 7-day file retention
+  - Paid: $20/year, 5GB storage, 30-day retention
+  - Premium: $99/year, 100GB storage, unlimited retention
+- [x] Organization-level storage pooling
+- [x] Per-user storage contribution tracking
+- [x] BILLING_ENABLED feature flag
+- [x] Database schema (subscription_plans, organization_subscriptions, organization_storage, user_storage_contributions)
+- [x] Billing service with plan management
+- [x] Billing controller and routes
+- [x] Storage limit enforcement middleware
+- [x] File retention service (automatic cleanup cron)
+- [x] Storage tracking on file upload/delete
+- [x] Billing status API endpoint
+- [x] Plans listing API endpoint
+- [x] Storage breakdown API endpoint (admin only)
+- [x] Upload check API endpoint
+
+### Phase 6: In-App Purchase Preparation ✅
+- [x] IAP implementation plan document (IAP_IMPLEMENTATION_PLAN.md)
+- [x] Stub endpoints for Apple/Google verification
+- [x] Webhook endpoints for App Store/Play Store notifications
+- [x] Restore purchases endpoint
+- [x] Subscription management URL endpoint
+- [x] Subscription details endpoint
+- [ ] Apple receipt validation (TODO)
+- [ ] Google purchase validation (TODO)
+- [ ] Mobile StoreKit 2 integration (TODO)
+- [ ] Mobile Google Play Billing integration (TODO)
+
+### Phase 7: Mobile Feature Parity ✅
+- [x] Mobile User type updated (role, email_verified fields)
+- [x] Email verification APIs added to mobile
+- [x] Password reset APIs added to mobile
+- [x] Billing API added to mobile
+- [x] IAP API added to mobile
+- [x] ForgotPasswordScreen created
+- [x] ResetPasswordScreen created
+- [x] Button component updated with text variant
+- [x] Navigation types updated
+- [x] API URL configured for production (submitlist.space)
+- [x] Mobile app version updated to 2.1.0
+
 ## Database Schema
 
 ### Core Tables
@@ -115,6 +159,12 @@ TaskManager is a full-stack task management application with web and mobile inte
 - `task_groups` - Task groups
 - `task_group_members` - Group membership
 - `task_assignees` - Multi-assignee support
+
+### Phase 5 Tables (Billing)
+- `subscription_plans` - Plan definitions (free/paid/premium)
+- `organization_subscriptions` - Active subscriptions per org
+- `organization_storage` - Storage usage tracking
+- `user_storage_contributions` - Per-user storage breakdown
 
 ## API Endpoints
 
@@ -160,6 +210,22 @@ TaskManager is a full-stack task management application with web and mobile inte
 ### CSV Import
 - POST `/api/tasks/import` - Import tasks from CSV
 - GET `/api/tasks/import/template` - Download CSV template
+
+### Billing
+- GET `/api/billing/status` - Get billing/storage status
+- GET `/api/billing/plans` - List subscription plans
+- GET `/api/billing/storage/breakdown` - Per-user storage breakdown (admin)
+- POST `/api/billing/storage/check-upload` - Check if upload allowed
+- POST `/api/billing/storage/recalculate` - Recalculate org storage
+
+### In-App Purchases
+- POST `/api/iap/verify/apple` - Verify Apple receipt (stub)
+- POST `/api/iap/verify/google` - Verify Google purchase (stub)
+- POST `/api/iap/restore` - Restore purchases (stub)
+- GET `/api/iap/management-url` - Get subscription management URL
+- GET `/api/iap/subscription` - Get subscription details
+- POST `/api/iap/webhooks/apple` - Apple webhook endpoint (stub)
+- POST `/api/iap/webhooks/google` - Google webhook endpoint (stub)
 
 ## Mobile Features
 
@@ -292,21 +358,29 @@ Deployment completed:
 - [x] Set up SSL certificates (Let's Encrypt - expires Feb 18, 2026)
 - [x] Configure HTTPS with HTTP/2
 - [x] Enable automatic SSL certificate renewal
+- [x] Deploy billing system (v2.1.0 - Nov 21, 2025)
+- [x] Run billing database migration (005_billing_subscriptions.sql)
 - [ ] Configure Firebase (optional - for push notifications)
 - [ ] Set up automated backups
 - [ ] Configure monitoring/logging
 - [ ] Test on physical mobile devices
 - [ ] Security audit
 - [ ] Load testing
+- [ ] Enable BILLING_ENABLED when ready for subscriptions
+- [ ] Implement Apple IAP verification
+- [ ] Implement Google Play verification
 
 ## Documentation
 
 - `README.md` - Project overview
 - `DEPLOYMENT.md` - Docker-based deployment guide
 - `DEPLOYMENT_ACTUAL.md` - **Actual deployment guide used for production** (PM2 + Nginx)
+- `DEPLOYMENT_COMPLETE.md` - **Complete deployment guide with all commands**
 - `deploy-to-droplet.sh` - **Automated deployment script**
 - `QUICKSTART.md` - Quick deployment guide
 - `PROJECT_STATUS.md` - This file (includes live deployment status)
+- `SUBSCRIPTION_BILLING_DESIGN.md` - Billing system design document
+- `IAP_IMPLEMENTATION_PLAN.md` - **In-App Purchase implementation guide**
 - `mobile/PUSH_NOTIFICATIONS_SETUP.md` - Push notification setup
 
 ## Cost Estimate (Digital Ocean)
@@ -328,9 +402,15 @@ For ongoing development:
 
 ---
 
-**Status**: ✅ LIVE IN PRODUCTION WITH SSL
+**Status**: ✅ LIVE IN PRODUCTION WITH SSL & BILLING INFRASTRUCTURE
 
 All core features implemented, tested, and **deployed to Digital Ocean with HTTPS**.
 
 **Live Application**: https://submitlist.space
 **SSL Certificate**: Valid until February 18, 2026 (auto-renewal enabled)
+
+**Latest Update (v2.1.0 - November 21, 2025):**
+- Billing system deployed with BILLING_ENABLED=false
+- IAP stub endpoints ready for Apple/Google integration
+- File retention service ready (activates when billing enabled)
+- See `IAP_IMPLEMENTATION_PLAN.md` for next steps on mobile subscriptions

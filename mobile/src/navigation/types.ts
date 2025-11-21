@@ -2,6 +2,9 @@ export type RootStackParamList = {
   // Auth Stack
   Login: undefined;
   Register: undefined;
+  ForgotPassword: undefined;
+  ResetPassword: { token?: string };
+  Onboarding: undefined;
 
   // Organization Stack
   OrganizationsList: undefined;

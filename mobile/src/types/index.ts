@@ -3,7 +3,47 @@ export interface User {
   email: string;
   username?: string;
   name: string;
+  role?: 'member' | 'admin' | 'super_admin';
+  email_verified?: boolean;
+  email_verified_at?: string;
   created_at: string;
+}
+
+// Billing types
+export interface SubscriptionPlan {
+  name: string;
+  slug: 'free' | 'paid' | 'premium';
+  price_cents: number;
+  billing_interval: string | null;
+  max_storage_bytes: number;
+  file_retention_days: number | null;
+}
+
+export interface BillingStatus {
+  plan: SubscriptionPlan;
+  status: string;
+  trial_ends?: string;
+  period_ends?: string;
+  payment_platform?: 'stripe' | 'apple' | 'google';
+  storage: {
+    used_bytes: number;
+    max_bytes: number;
+    percentage: number;
+  };
+}
+
+export interface SubscriptionDetails {
+  subscription: {
+    plan: SubscriptionPlan;
+    status: string;
+    payment_platform?: string;
+    current_period_start?: string;
+    current_period_end?: string;
+    trial_end?: string;
+    canceled_at?: string;
+    auto_renew: boolean;
+  } | null;
+  message?: string;
 }
 
 export interface Organization {

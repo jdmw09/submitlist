@@ -1,8 +1,8 @@
 # TaskManager - Complete Deployment Guide
 
-**Last Updated**: November 20, 2025  
-**Production URL**: https://submitlist.space  
-**Version**: 2.0.0 (With Admin Features & Organization Management)
+**Last Updated**: November 21, 2025
+**Production URL**: https://submitlist.space
+**Version**: 2.1.0 (With Billing System & IAP Preparation)
 
 ---
 
@@ -95,6 +95,9 @@ MAILGUN_DOMAIN=submitlist.space
 FROM_EMAIL=noreply@submitlist.space
 FROM_NAME=TaskManager
 APP_URL=https://submitlist.space
+
+# Billing (currently disabled)
+BILLING_ENABLED=false
 ```
 
 ---
@@ -192,6 +195,61 @@ sudo -u postgres psql -c "SELECT * FROM pg_stat_activity WHERE datname='taskmana
 ```bash
 sudo certbot certificates
 ```
+
+---
+
+## Billing System (v2.1.0)
+
+### Current Status
+- **BILLING_ENABLED**: false (disabled for launch)
+- **Database**: Migration 005_billing_subscriptions.sql applied
+- **IAP Endpoints**: Stub implementations ready
+
+### Enable Billing
+```bash
+# Edit backend .env
+ssh -i ~/.ssh/taskmanager_rsa root@submitlist.space
+nano /home/taskmanager/TaskManager/backend/.env
+# Change: BILLING_ENABLED=true
+
+# Restart backend
+sudo -u taskmanager pm2 restart taskmanager-backend
+```
+
+### Billing API Endpoints
+```bash
+# Check billing status (returns "Billing is not enabled" when disabled)
+curl https://submitlist.space/api/billing/status -H "Authorization: Bearer TOKEN"
+
+# List plans
+curl https://submitlist.space/api/billing/plans
+
+# Check storage breakdown (admin only)
+curl https://submitlist.space/api/billing/storage/breakdown -H "Authorization: Bearer TOKEN"
+```
+
+### IAP Endpoints (Stub)
+```bash
+# Apple verification
+POST /api/iap/verify/apple
+
+# Google verification
+POST /api/iap/verify/google
+
+# Subscription details
+GET /api/iap/subscription
+
+# Management URL
+GET /api/iap/management-url
+```
+
+### Next Steps for IAP
+See `IAP_IMPLEMENTATION_PLAN.md` for:
+1. App Store Connect product setup
+2. Google Play Console subscription setup
+3. StoreKit 2 mobile integration (iOS)
+4. Google Play Billing integration (Android)
+5. Server-side receipt validation implementation
 
 ### Manual Renewal
 ```bash
