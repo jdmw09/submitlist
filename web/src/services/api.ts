@@ -9,12 +9,19 @@ const api = axios.create({
   },
 });
 
-// Add auth token to requests
+// Add auth token to requests and handle FormData properly
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('authToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Don't set Content-Type for FormData - let the browser handle it
+  // This ensures the correct boundary is included for multipart/form-data
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+
   return config;
 });
 
@@ -164,9 +171,8 @@ export const taskAPI = {
     api.put(`/tasks/requirements/${requirementId}`, { completed }),
 
   addCompletion: (taskId: number, formData: FormData) =>
-    api.post(`/tasks/${taskId}/completions`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+    // Don't set Content-Type manually - axios will set it with correct boundary for FormData
+    api.post(`/tasks/${taskId}/completions`, formData),
 
   getCompletions: (taskId: number) =>
     api.get(`/tasks/${taskId}/completions`),

@@ -23,6 +23,22 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(helmet());
 app.use(cors());
+
+// Debug middleware for file uploads - logs before any parsing
+app.use((req, res, next) => {
+  if (req.method === 'POST' && req.path.includes('completions')) {
+    const contentLength = req.headers['content-length'];
+    const contentType = req.headers['content-type'];
+    const userAgent = req.headers['user-agent'];
+    console.log(`[Upload Debug] POST ${req.path}`);
+    console.log(`[Upload Debug] Content-Length: ${contentLength} bytes (${Math.round(parseInt(contentLength || '0') / 1024 / 1024 * 100) / 100} MB)`);
+    console.log(`[Upload Debug] Content-Type: ${contentType}`);
+    console.log(`[Upload Debug] User-Agent: ${userAgent?.substring(0, 100)}`);
+    console.log(`[Upload Debug] Is iOS Safari: ${userAgent?.includes('Safari') && (userAgent?.includes('iPhone') || userAgent?.includes('iPad'))}`);
+  }
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
