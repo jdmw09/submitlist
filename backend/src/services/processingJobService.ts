@@ -1,4 +1,5 @@
 import { compressVideo, VideoCompressionProgress } from '../utils/videoCompressor';
+import { query } from '../config/database';
 import path from 'path';
 
 /**
@@ -150,6 +151,41 @@ export async function startVideoCompression(
 
     console.log(`[Job Service] Completed: ${jobId}`);
     console.log(`  Saved: ${result.compressionRatio.toFixed(1)}%`);
+
+    // Update the database with the new file path (converted to MP4)
+    try {
+      const newRelativePath = result.newPath.replace(/^.*\/uploads/, '/uploads');
+      const oldRelativePath = job.filePath.replace(/^.*\/uploads/, '/uploads');
+
+      // Get current file_path from completion
+      const completionResult = await query(
+        'SELECT file_path FROM task_completions WHERE id = $1',
+        [job.completionId]
+      );
+
+      if (completionResult.rows.length > 0) {
+        let filePaths: string[] = [];
+        try {
+          filePaths = JSON.parse(completionResult.rows[0].file_path);
+        } catch {
+          filePaths = [completionResult.rows[0].file_path];
+        }
+
+        // Replace old path with new path
+        const updatedPaths = filePaths.map(p =>
+          p === oldRelativePath ? newRelativePath : p
+        );
+
+        await query(
+          'UPDATE task_completions SET file_path = $1 WHERE id = $2',
+          [JSON.stringify(updatedPaths), job.completionId]
+        );
+
+        console.log(`[Job Service] Updated database path: ${oldRelativePath} -> ${newRelativePath}`);
+      }
+    } catch (dbError) {
+      console.error('[Job Service] Failed to update database path:', dbError);
+    }
 
     // Auto-cleanup after 1 hour
     setTimeout(() => {
