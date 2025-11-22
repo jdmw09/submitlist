@@ -13,6 +13,9 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  // Log all incoming files for debugging iOS issues
+  console.log(`[Upload] Incoming file: ${file.originalname}, MIME: ${file.mimetype}, size: ${file.size || 'unknown'}`);
+
   // Support standard and Apple-specific formats, plus CSV
   // Added dng for iPhone RAW photos, cr2/nef/arw for other camera RAW formats
   const allowedTypes = /jpeg|jpg|png|gif|webp|heic|heif|tiff|tif|dng|cr2|nef|arw|mp4|mov|m4v|avi|webm|pdf|doc|docx|csv/;
