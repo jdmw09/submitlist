@@ -80,6 +80,21 @@ CREATE TABLE IF NOT EXISTS task_group_members (
   UNIQUE(group_id, user_id)
 );
 
+-- Organization settings table
+CREATE TABLE IF NOT EXISTS organization_settings (
+  id SERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE UNIQUE,
+  -- Task display settings
+  default_task_sort VARCHAR(20) NOT NULL DEFAULT 'due_date', -- 'due_date' | 'priority'
+  hide_completed_tasks BOOLEAN NOT NULL DEFAULT false,
+  -- Archive settings
+  auto_archive_enabled BOOLEAN NOT NULL DEFAULT false,
+  auto_archive_after_days INTEGER DEFAULT 7, -- Days after completion to auto-archive
+  archive_schedule VARCHAR(20) NOT NULL DEFAULT 'daily', -- 'daily' | 'weekly_sunday' | 'weekly_monday'
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Tasks table
 CREATE TABLE IF NOT EXISTS tasks (
   id SERIAL PRIMARY KEY,
@@ -96,6 +111,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   parent_template_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL, -- For scheduled task instances
   is_private BOOLEAN DEFAULT false,
   group_id INTEGER REFERENCES task_groups(id) ON DELETE SET NULL,
+  archived_at TIMESTAMP DEFAULT NULL, -- When task was archived
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -155,7 +155,7 @@ export const createTask = async (req: AuthRequest, res: Response) => {
 export const getTasks = async (req: AuthRequest, res: Response) => {
   try {
     const { organizationId } = req.params;
-    const { status, assignedToMe } = req.query;
+    const { status, assignedToMe, sort, hideCompleted } = req.query;
     const userId = req.user!.id;
 
     // Check if user is a member
@@ -168,7 +168,14 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: 'You are not a member of this organization' });
     }
 
-    // Build query with private task filtering
+    // Get organization settings for default sort
+    const settingsResult = await query(
+      'SELECT default_task_sort, hide_completed_tasks FROM organization_settings WHERE organization_id = $1',
+      [organizationId]
+    );
+    const orgSettings = settingsResult.rows[0] || { default_task_sort: 'due_date', hide_completed_tasks: false };
+
+    // Build query with private task filtering and exclude archived tasks
     let queryText = `
       SELECT t.*,
              u.name as assigned_user_name,
@@ -180,6 +187,7 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
       LEFT JOIN users c ON t.created_by_id = c.id
       LEFT JOIN task_requirements tr ON t.id = tr.task_id
       WHERE t.organization_id = $1
+        AND t.archived_at IS NULL
         AND (
           t.is_private = false
           OR t.is_private IS NULL
@@ -200,13 +208,47 @@ export const getTasks = async (req: AuthRequest, res: Response) => {
       paramIndex++;
     }
 
+    // Hide completed tasks based on query param or org settings
+    const shouldHideCompleted = hideCompleted === 'true' || (hideCompleted !== 'false' && orgSettings.hide_completed_tasks);
+    if (shouldHideCompleted) {
+      queryText += ` AND t.status != 'completed'`;
+    }
+
     if (assignedToMe === 'true') {
-      queryText += ` AND t.assigned_user_id = $${paramIndex}`;
+      queryText += ` AND (t.assigned_user_id = $${paramIndex} OR EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = $${paramIndex}))`;
       params.push(userId);
       paramIndex++;
     }
 
-    queryText += ` GROUP BY t.id, u.name, c.name ORDER BY t.created_at DESC`;
+    queryText += ` GROUP BY t.id, u.name, c.name`;
+
+    // Determine sort order - use query param or fall back to org settings
+    const sortOrder = sort || orgSettings.default_task_sort;
+
+    if (sortOrder === 'priority') {
+      // Priority sort: status order (overdue first, then pending, in_progress, submitted, completed last), then by due date
+      queryText += `
+        ORDER BY
+          CASE t.status
+            WHEN 'overdue' THEN 0
+            WHEN 'pending' THEN 1
+            WHEN 'in_progress' THEN 2
+            WHEN 'submitted' THEN 3
+            WHEN 'completed' THEN 4
+            ELSE 5
+          END,
+          t.end_date ASC NULLS LAST,
+          t.created_at DESC
+      `;
+    } else {
+      // Default: due_date sort - upcoming deadlines first, null dates at end
+      queryText += `
+        ORDER BY
+          CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END,
+          t.end_date ASC NULLS LAST,
+          t.created_at DESC
+      `;
+    }
 
     const result = await query(queryText, params);
 
@@ -1051,6 +1093,294 @@ export const completeTaskByAssignee = async (req: AuthRequest, res: Response) =>
     res.json({ message: 'Task completed successfully' });
   } catch (error) {
     console.error('Complete task by assignee error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ===== TASK COPY =====
+
+/**
+ * POST /api/tasks/:taskId/copy
+ * Copy a task to create a new one (useful for re-doing completed tasks)
+ */
+export const copyTask = async (req: AuthRequest, res: Response) => {
+  try {
+    const { taskId } = req.params;
+    const { title, endDate, assignedUserIds, groupId } = req.body;
+    const userId = req.user!.id;
+
+    // Get original task
+    const taskResult = await query('SELECT * FROM tasks WHERE id = $1', [taskId]);
+    if (taskResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const originalTask = taskResult.rows[0];
+
+    // Check if user is a member of the organization
+    const memberCheck = await query(
+      'SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2',
+      [originalTask.organization_id, userId]
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'You are not a member of this organization' });
+    }
+
+    // Create new task with copied data
+    const newTaskResult = await query(
+      `INSERT INTO tasks (
+        organization_id, title, details, created_by_id, start_date, end_date,
+        schedule_type, schedule_frequency, status, group_id, is_private
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *`,
+      [
+        originalTask.organization_id,
+        title || `${originalTask.title} (Copy)`,
+        originalTask.details,
+        userId,
+        null, // Reset start date
+        endDate || null, // Use provided end date or null
+        originalTask.schedule_type,
+        originalTask.schedule_frequency,
+        'pending', // Always start as pending
+        groupId !== undefined ? groupId : originalTask.group_id,
+        originalTask.is_private
+      ]
+    );
+
+    const newTask = newTaskResult.rows[0];
+
+    // Copy requirements (reset completion status)
+    const requirementsResult = await query(
+      'SELECT description, order_index FROM task_requirements WHERE task_id = $1 ORDER BY order_index',
+      [taskId]
+    );
+
+    for (const req of requirementsResult.rows) {
+      await query(
+        'INSERT INTO task_requirements (task_id, description, order_index, completed) VALUES ($1, $2, $3, false)',
+        [newTask.id, req.description, req.order_index]
+      );
+    }
+
+    // Add assignees if provided
+    let assigneeIds: number[] = [];
+    if (assignedUserIds && Array.isArray(assignedUserIds)) {
+      assigneeIds = assignedUserIds;
+    } else if (groupId) {
+      // Get group members
+      const groupMembersResult = await query(
+        'SELECT user_id FROM task_group_members WHERE group_id = $1',
+        [groupId]
+      );
+      assigneeIds = groupMembersResult.rows.map((r: any) => r.user_id);
+    }
+
+    for (const assigneeId of assigneeIds) {
+      await query(
+        `INSERT INTO task_assignees (task_id, user_id, assigned_by_id, status)
+         VALUES ($1, $2, $3, 'pending')
+         ON CONFLICT (task_id, user_id) DO NOTHING`,
+        [newTask.id, assigneeId, userId]
+      );
+
+      // Notify assignees
+      if (assigneeId !== userId) {
+        await query(
+          `INSERT INTO notifications (user_id, type, title, message, task_id)
+           VALUES ($1, 'task_assigned', 'New task assigned', $2, $3)`,
+          [assigneeId, `You have been assigned to: ${newTask.title}`, newTask.id]
+        );
+      }
+    }
+
+    // Log audit entry
+    await logAudit({
+      task_id: newTask.id,
+      user_id: userId,
+      action: 'created',
+      entity_type: 'task',
+      entity_id: newTask.id,
+      metadata: { copied_from_task_id: taskId },
+    });
+
+    const taskWithDetails = await getTaskById(newTask.id);
+
+    res.status(201).json({
+      message: 'Task copied successfully',
+      task: taskWithDetails,
+    });
+  } catch (error) {
+    console.error('Copy task error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ===== TASK ARCHIVE =====
+
+/**
+ * POST /api/tasks/:taskId/archive
+ * Archive a completed task
+ */
+export const archiveTask = async (req: AuthRequest, res: Response) => {
+  try {
+    const { taskId } = req.params;
+    const userId = req.user!.id;
+
+    // Get task details
+    const taskResult = await query('SELECT * FROM tasks WHERE id = $1', [taskId]);
+    if (taskResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const task = taskResult.rows[0];
+
+    // Check if user is admin or creator
+    const memberCheck = await query(
+      'SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2',
+      [task.organization_id, userId]
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'You do not have access to this task' });
+    }
+
+    const isAdmin = memberCheck.rows[0].role === 'admin';
+    const isCreator = task.created_by_id === userId;
+
+    if (!isAdmin && !isCreator) {
+      return res.status(403).json({ error: 'Only task creator or organization admin can archive tasks' });
+    }
+
+    // Archive the task
+    await query(
+      'UPDATE tasks SET archived_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [taskId]
+    );
+
+    // Log audit entry
+    await logAudit({
+      task_id: parseInt(taskId),
+      user_id: userId,
+      action: 'archived',
+      entity_type: 'task',
+      entity_id: parseInt(taskId),
+    });
+
+    res.json({ message: 'Task archived successfully' });
+  } catch (error) {
+    console.error('Archive task error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * POST /api/tasks/:taskId/unarchive
+ * Restore an archived task
+ */
+export const unarchiveTask = async (req: AuthRequest, res: Response) => {
+  try {
+    const { taskId } = req.params;
+    const userId = req.user!.id;
+
+    // Get task details
+    const taskResult = await query('SELECT * FROM tasks WHERE id = $1', [taskId]);
+    if (taskResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const task = taskResult.rows[0];
+
+    if (!task.archived_at) {
+      return res.status(400).json({ error: 'Task is not archived' });
+    }
+
+    // Check if user is admin or creator
+    const memberCheck = await query(
+      'SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2',
+      [task.organization_id, userId]
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'You do not have access to this task' });
+    }
+
+    const isAdmin = memberCheck.rows[0].role === 'admin';
+    const isCreator = task.created_by_id === userId;
+
+    if (!isAdmin && !isCreator) {
+      return res.status(403).json({ error: 'Only task creator or organization admin can unarchive tasks' });
+    }
+
+    // Unarchive the task
+    await query(
+      'UPDATE tasks SET archived_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [taskId]
+    );
+
+    // Log audit entry
+    await logAudit({
+      task_id: parseInt(taskId),
+      user_id: userId,
+      action: 'unarchived',
+      entity_type: 'task',
+      entity_id: parseInt(taskId),
+    });
+
+    res.json({ message: 'Task unarchived successfully' });
+  } catch (error) {
+    console.error('Unarchive task error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * GET /api/tasks/organization/:organizationId/archived
+ * Get archived tasks for an organization
+ */
+export const getArchivedTasks = async (req: AuthRequest, res: Response) => {
+  try {
+    const { organizationId } = req.params;
+    const userId = req.user!.id;
+
+    // Check if user is a member
+    const memberCheck = await query(
+      'SELECT id FROM organization_members WHERE organization_id = $1 AND user_id = $2',
+      [organizationId, userId]
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'You are not a member of this organization' });
+    }
+
+    const result = await query(
+      `SELECT t.*,
+              c.name as created_by_name,
+              COUNT(DISTINCT tr.id) as total_requirements,
+              COUNT(DISTINCT CASE WHEN tr.completed = true THEN tr.id END) as completed_requirements
+       FROM tasks t
+       LEFT JOIN users c ON t.created_by_id = c.id
+       LEFT JOIN task_requirements tr ON t.id = tr.task_id
+       WHERE t.organization_id = $1
+         AND t.archived_at IS NOT NULL
+         AND (
+           t.is_private = false
+           OR t.is_private IS NULL
+           OR t.created_by_id = $2
+           OR EXISTS (
+             SELECT 1 FROM task_assignees ta
+             WHERE ta.task_id = t.id AND ta.user_id = $2
+           )
+         )
+       GROUP BY t.id, c.name
+       ORDER BY t.archived_at DESC`,
+      [organizationId, userId]
+    );
+
+    res.json({ tasks: result.rows });
+  } catch (error) {
+    console.error('Get archived tasks error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

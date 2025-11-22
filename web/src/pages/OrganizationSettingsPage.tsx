@@ -23,6 +23,14 @@ interface JoinRequest {
   status: string;
 }
 
+interface TaskSettings {
+  default_task_sort: 'due_date' | 'priority';
+  hide_completed_tasks: boolean;
+  auto_archive_enabled: boolean;
+  auto_archive_after_days: number;
+  archive_schedule: 'daily' | 'weekly_sunday' | 'weekly_monday';
+}
+
 const OrganizationSettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const [orgName, setOrgName] = useState('');
@@ -33,6 +41,14 @@ const OrganizationSettingsPage: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('member');
+  const [taskSettings, setTaskSettings] = useState<TaskSettings>({
+    default_task_sort: 'due_date',
+    hide_completed_tasks: false,
+    auto_archive_enabled: false,
+    auto_archive_after_days: 7,
+    archive_schedule: 'daily',
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
 
   const loadOrganizationDetails = async () => {
     const storedOrg = localStorage.getItem('selectedOrganization');
@@ -69,10 +85,55 @@ const OrganizationSettingsPage: React.FC = () => {
     }
   };
 
+  const loadTaskSettings = async () => {
+    const storedOrg = localStorage.getItem('selectedOrganization');
+    if (!storedOrg) return;
+    const org = JSON.parse(storedOrg);
+
+    try {
+      const response = await organizationAPI.getSettings(org.id);
+      const settings = response.data.settings;
+      if (settings) {
+        setTaskSettings({
+          default_task_sort: settings.default_task_sort || 'due_date',
+          hide_completed_tasks: settings.hide_completed_tasks || false,
+          auto_archive_enabled: settings.auto_archive_enabled || false,
+          auto_archive_after_days: settings.auto_archive_after_days || 7,
+          archive_schedule: settings.archive_schedule || 'daily',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load task settings:', error);
+    }
+  };
+
+  const saveTaskSettings = async () => {
+    const storedOrg = localStorage.getItem('selectedOrganization');
+    if (!storedOrg) return;
+    const org = JSON.parse(storedOrg);
+
+    setSavingSettings(true);
+    try {
+      await organizationAPI.updateSettings(org.id, {
+        defaultTaskSort: taskSettings.default_task_sort,
+        hideCompletedTasks: taskSettings.hide_completed_tasks,
+        autoArchiveEnabled: taskSettings.auto_archive_enabled,
+        autoArchiveAfterDays: taskSettings.auto_archive_after_days,
+        archiveSchedule: taskSettings.archive_schedule,
+      });
+      alert('Task settings updated successfully');
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to update settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadOrganizationDetails();
     loadJoinRequests();
+    loadTaskSettings();
   }, []);
 
   const addMember = async (e: React.FormEvent) => {
@@ -216,6 +277,92 @@ const OrganizationSettingsPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {isAdmin && (
+          <div className="settings-section">
+            <h2>Task Settings</h2>
+            <div className="task-settings-form">
+              <div className="setting-row">
+                <label htmlFor="default-sort">Default Sort Order</label>
+                <select
+                  id="default-sort"
+                  value={taskSettings.default_task_sort}
+                  onChange={(e) => setTaskSettings({ ...taskSettings, default_task_sort: e.target.value as 'due_date' | 'priority' })}
+                  className="setting-select"
+                >
+                  <option value="due_date">Due Date</option>
+                  <option value="priority">Priority</option>
+                </select>
+              </div>
+
+              <div className="setting-row">
+                <label htmlFor="hide-completed">
+                  <input
+                    type="checkbox"
+                    id="hide-completed"
+                    checked={taskSettings.hide_completed_tasks}
+                    onChange={(e) => setTaskSettings({ ...taskSettings, hide_completed_tasks: e.target.checked })}
+                  />
+                  Hide Completed Tasks by Default
+                </label>
+              </div>
+
+              <div className="setting-row">
+                <label htmlFor="auto-archive">
+                  <input
+                    type="checkbox"
+                    id="auto-archive"
+                    checked={taskSettings.auto_archive_enabled}
+                    onChange={(e) => setTaskSettings({ ...taskSettings, auto_archive_enabled: e.target.checked })}
+                  />
+                  Enable Auto-Archive for Completed Tasks
+                </label>
+              </div>
+
+              {taskSettings.auto_archive_enabled && (
+                <>
+                  <div className="setting-row indented">
+                    <label htmlFor="archive-days">Archive After</label>
+                    <select
+                      id="archive-days"
+                      value={taskSettings.auto_archive_after_days}
+                      onChange={(e) => setTaskSettings({ ...taskSettings, auto_archive_after_days: parseInt(e.target.value) })}
+                      className="setting-select"
+                    >
+                      <option value={1}>1 day</option>
+                      <option value={3}>3 days</option>
+                      <option value={7}>7 days</option>
+                      <option value={14}>14 days</option>
+                      <option value={30}>30 days</option>
+                    </select>
+                  </div>
+
+                  <div className="setting-row indented">
+                    <label htmlFor="archive-schedule">Archive Schedule</label>
+                    <select
+                      id="archive-schedule"
+                      value={taskSettings.archive_schedule}
+                      onChange={(e) => setTaskSettings({ ...taskSettings, archive_schedule: e.target.value as 'daily' | 'weekly_sunday' | 'weekly_monday' })}
+                      className="setting-select"
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly_sunday">Weekly (Sunday)</option>
+                      <option value="weekly_monday">Weekly (Monday)</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              <button
+                className="btn btn-primary save-settings-btn"
+                onClick={saveTaskSettings}
+                disabled={savingSettings}
+              >
+                {savingSettings ? 'Saving...' : 'Save Settings'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {isAdmin && joinRequests.length > 0 && (
           <div className="settings-section">

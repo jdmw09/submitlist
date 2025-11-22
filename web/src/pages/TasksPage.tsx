@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { taskAPI } from '../services/api';
+import { taskAPI, organizationAPI } from '../services/api';
 import { Task } from '../types';
 import Layout from '../components/Layout';
 import './TasksPage.css';
@@ -8,10 +8,14 @@ import './TasksPage.css';
 const TasksPage: React.FC = () => {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'mine'>('all');
   const [selectedOrg, setSelectedOrg] = useState<any>(null);
+  const [sortOrder, setSortOrder] = useState<'due_date' | 'priority'>('due_date');
+  const [showArchived, setShowArchived] = useState(false);
+  const [hideCompleted, setHideCompleted] = useState(false);
 
   useEffect(() => {
     loadSelectedOrg();
@@ -20,8 +24,15 @@ const TasksPage: React.FC = () => {
   useEffect(() => {
     if (selectedOrg) {
       loadTasks();
+      loadOrgSettings();
     }
-  }, [selectedOrg, filter]);
+  }, [selectedOrg, filter, sortOrder, hideCompleted]);
+
+  useEffect(() => {
+    if (selectedOrg && showArchived) {
+      loadArchivedTasks();
+    }
+  }, [selectedOrg, showArchived]);
 
   const loadSelectedOrg = () => {
     const stored = localStorage.getItem('selectedOrganization');
@@ -29,6 +40,20 @@ const TasksPage: React.FC = () => {
       setSelectedOrg(JSON.parse(stored));
     } else {
       navigate('/organizations');
+    }
+  };
+
+  const loadOrgSettings = async () => {
+    if (!selectedOrg) return;
+    try {
+      const response = await organizationAPI.getSettings(selectedOrg.id);
+      const settings = response.data.settings;
+      if (settings) {
+        setSortOrder(settings.default_task_sort || 'due_date');
+        setHideCompleted(settings.hide_completed_tasks || false);
+      }
+    } catch (error) {
+      console.error('Failed to load org settings:', error);
     }
   };
 
@@ -40,6 +65,8 @@ const TasksPage: React.FC = () => {
     try {
       const response = await taskAPI.getAll(selectedOrg.id, {
         assignedToMe: filter === 'mine',
+        sort: sortOrder,
+        hideCompleted: hideCompleted,
       });
       setTasks(response.data.tasks || []);
     } catch (error: any) {
@@ -48,6 +75,16 @@ const TasksPage: React.FC = () => {
       setTasks([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadArchivedTasks = async () => {
+    if (!selectedOrg) return;
+    try {
+      const response = await taskAPI.getArchived(selectedOrg.id);
+      setArchivedTasks(response.data.tasks || []);
+    } catch (error: any) {
+      console.error('Failed to load archived tasks:', error);
     }
   };
 
@@ -97,20 +134,51 @@ const TasksPage: React.FC = () => {
         </div>
 
         <div className="filters">
-          <button
-            className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => setFilter('all')}
-            aria-pressed={filter === 'all'}
-          >
-            All Tasks
-          </button>
-          <button
-            className={`filter-btn ${filter === 'mine' ? 'active' : ''}`}
-            onClick={() => setFilter('mine')}
-            aria-pressed={filter === 'mine'}
-          >
-            My Tasks
-          </button>
+          <div className="filter-group">
+            <button
+              className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
+              onClick={() => setFilter('all')}
+              aria-pressed={filter === 'all'}
+            >
+              All Tasks
+            </button>
+            <button
+              className={`filter-btn ${filter === 'mine' ? 'active' : ''}`}
+              onClick={() => setFilter('mine')}
+              aria-pressed={filter === 'mine'}
+            >
+              My Tasks
+            </button>
+            <button
+              className={`filter-btn ${showArchived ? 'active' : ''}`}
+              onClick={() => setShowArchived(!showArchived)}
+              aria-pressed={showArchived}
+            >
+              Archived
+            </button>
+          </div>
+
+          <div className="filter-group">
+            <label className="sort-label">
+              Sort:
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as 'due_date' | 'priority')}
+                className="sort-select"
+              >
+                <option value="due_date">Due Date</option>
+                <option value="priority">Priority</option>
+              </select>
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={hideCompleted}
+                onChange={(e) => setHideCompleted(e.target.checked)}
+              />
+              Hide completed
+            </label>
+          </div>
         </div>
 
         {error && (
@@ -208,6 +276,38 @@ const TasksPage: React.FC = () => {
                 </Link>
               );
             })}
+          </div>
+        )}
+
+        {showArchived && (
+          <div className="archived-section">
+            <h2>Archived Tasks</h2>
+            {archivedTasks.length === 0 ? (
+              <p className="empty-text">No archived tasks</p>
+            ) : (
+              <div className="tasks-grid archived">
+                {archivedTasks.map((task) => (
+                  <Link
+                    to={`/tasks/${task.id}`}
+                    key={task.id}
+                    className="task-card archived"
+                  >
+                    <div className="task-header">
+                      <h3>{task.title}</h3>
+                      <span className="status-badge archived-badge">
+                        Archived
+                      </span>
+                    </div>
+                    {task.details && (
+                      <p className="task-details">{task.details.substring(0, 100)}...</p>
+                    )}
+                    <div className="task-meta">
+                      <span>Archived: {task.archived_at ? new Date(task.archived_at).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

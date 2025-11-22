@@ -14,6 +14,7 @@ import billingRoutes from './routes/billingRoutes';
 import iapRoutes from './routes/iapRoutes';
 import { startScheduledTaskService } from './services/scheduledTaskService';
 import { startFileRetentionService } from './services/fileRetentionService';
+import { startArchiveTaskService } from './services/archiveTaskService';
 
 dotenv.config();
 
@@ -100,6 +101,9 @@ app.listen(PORT, () => {
 
   // Start file retention service (for billing-based file cleanup)
   startFileRetentionService();
+
+  // Start archive task service (for auto-archiving completed tasks)
+  startArchiveTaskService();
 });
 
 export default app;

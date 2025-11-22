@@ -32,8 +32,18 @@
 
 .filters {
   display: flex;
-  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
   margin-bottom: 24px;
+}
+
+.filter-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .filter-btn {
@@ -57,6 +67,69 @@
   background: #007AFF;
   border-color: #007AFF;
   color: white;
+}
+
+.sort-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.sort-select {
+  padding: 8px 12px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+.sort-select:focus {
+  border-color: #007AFF;
+  outline: none;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.archived-section {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 2px solid #e0e0e0;
+}
+
+.archived-section h2 {
+  font-size: 24px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.empty-text {
+  color: #999;
+  font-style: italic;
+}
+
+.task-card.archived {
+  opacity: 0.7;
+  background: #f9f9f9;
+}
+
+.archived-badge {
+  background: #999 !important;
 }
 
 .tasks-grid {

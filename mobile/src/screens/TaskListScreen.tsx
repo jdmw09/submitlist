@@ -8,10 +8,12 @@ import {
   Alert,
   RefreshControl,
   SafeAreaView,
+  Switch,
+  SectionList,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../contexts/ThemeContext';
-import { taskAPI } from '../services/api';
+import { taskAPI, organizationAPI } from '../services/api';
 import { Task } from '../types';
 import OfflineBanner from '../components/OfflineBanner';
 import offlineStorage from '../services/offlineStorage';
@@ -20,10 +22,14 @@ import networkService from '../services/networkService';
 const TaskListScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<any>(null);
   const [filter, setFilter] = useState<'all' | 'mine'>('all');
+  const [sortOrder, setSortOrder] = useState<'due_date' | 'priority'>('due_date');
+  const [showArchived, setShowArchived] = useState(false);
+  const [hideCompleted, setHideCompleted] = useState(false);
 
   useEffect(() => {
     loadSelectedOrganization();
@@ -32,13 +38,34 @@ const TaskListScreen = ({ navigation }: any) => {
   useEffect(() => {
     if (selectedOrg) {
       loadTasks();
+      loadOrgSettings();
     }
-  }, [selectedOrg, filter]);
+  }, [selectedOrg, filter, sortOrder, hideCompleted]);
+
+  useEffect(() => {
+    if (selectedOrg && showArchived) {
+      loadArchivedTasks();
+    }
+  }, [selectedOrg, showArchived]);
 
   const loadSelectedOrganization = async () => {
     const stored = await AsyncStorage.getItem('selectedOrganization');
     if (stored) {
       setSelectedOrg(JSON.parse(stored));
+    }
+  };
+
+  const loadOrgSettings = async () => {
+    if (!selectedOrg || !networkService.getIsOnline()) return;
+    try {
+      const response = await organizationAPI.getSettings(selectedOrg.id);
+      const settings = response.data.settings;
+      if (settings) {
+        setSortOrder(settings.default_task_sort || 'due_date');
+        setHideCompleted(settings.hide_completed_tasks || false);
+      }
+    } catch (error) {
+      console.log('Failed to load org settings:', error);
     }
   };
 
@@ -51,6 +78,8 @@ const TaskListScreen = ({ navigation }: any) => {
         // Online: fetch from API
         const response = await taskAPI.getAll(selectedOrg.id, {
           assignedToMe: filter === 'mine',
+          sort: sortOrder,
+          hideCompleted: hideCompleted,
         });
         const fetchedTasks = response.data.tasks;
         setTasks(fetchedTasks);
@@ -81,6 +110,16 @@ const TaskListScreen = ({ navigation }: any) => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadArchivedTasks = async () => {
+    if (!selectedOrg || !networkService.getIsOnline()) return;
+    try {
+      const response = await taskAPI.getArchived(selectedOrg.id);
+      setArchivedTasks(response.data.tasks || []);
+    } catch (error) {
+      console.log('Failed to load archived tasks:', error);
     }
   };
 
@@ -167,38 +206,79 @@ const TaskListScreen = ({ navigation }: any) => {
       </View>
 
       <View style={styles.filters}>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            { backgroundColor: colors.cardBg, borderColor: colors.border },
-            filter === 'all' && { backgroundColor: colors.primary, borderColor: colors.primary }
-          ]}
-          onPress={() => setFilter('all')}
-        >
-          <Text style={[
-            styles.filterText,
-            { color: colors.textSecondary },
-            filter === 'all' && styles.filterTextActive
-          ]}>
-            All Tasks
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            { backgroundColor: colors.cardBg, borderColor: colors.border },
-            filter === 'mine' && { backgroundColor: colors.primary, borderColor: colors.primary }
-          ]}
-          onPress={() => setFilter('mine')}
-        >
-          <Text style={[
-            styles.filterText,
-            { color: colors.textSecondary },
-            filter === 'mine' && styles.filterTextActive
-          ]}>
-            My Tasks
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.filterRow}>
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              { backgroundColor: colors.cardBg, borderColor: colors.border },
+              filter === 'all' && { backgroundColor: colors.primary, borderColor: colors.primary }
+            ]}
+            onPress={() => setFilter('all')}
+          >
+            <Text style={[
+              styles.filterText,
+              { color: colors.textSecondary },
+              filter === 'all' && styles.filterTextActive
+            ]}>
+              All
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              { backgroundColor: colors.cardBg, borderColor: colors.border },
+              filter === 'mine' && { backgroundColor: colors.primary, borderColor: colors.primary }
+            ]}
+            onPress={() => setFilter('mine')}
+          >
+            <Text style={[
+              styles.filterText,
+              { color: colors.textSecondary },
+              filter === 'mine' && styles.filterTextActive
+            ]}>
+              Mine
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              { backgroundColor: colors.cardBg, borderColor: colors.border },
+              showArchived && { backgroundColor: colors.primary, borderColor: colors.primary }
+            ]}
+            onPress={() => setShowArchived(!showArchived)}
+          >
+            <Text style={[
+              styles.filterText,
+              { color: colors.textSecondary },
+              showArchived && styles.filterTextActive
+            ]}>
+              Archived
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.optionsRow}>
+          <View style={styles.sortContainer}>
+            <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Sort:</Text>
+            <TouchableOpacity
+              style={[styles.sortButton, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+              onPress={() => setSortOrder(sortOrder === 'due_date' ? 'priority' : 'due_date')}
+            >
+              <Text style={[styles.sortButtonText, { color: colors.textPrimary }]}>
+                {sortOrder === 'due_date' ? 'Due Date' : 'Priority'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.toggleContainer}>
+            <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>Hide done</Text>
+            <Switch
+              value={hideCompleted}
+              onValueChange={setHideCompleted}
+              trackColor={{ false: colors.border, true: colors.primary }}
+            />
+          </View>
+        </View>
       </View>
 
       <FlatList
@@ -215,6 +295,30 @@ const TaskListScreen = ({ navigation }: any) => {
             <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>Create one to get started</Text>
           </View>
         }
+        ListFooterComponent={showArchived && archivedTasks.length > 0 ? (
+          <View style={[styles.archivedSection, { borderTopColor: colors.border }]}>
+            <Text style={[styles.archivedTitle, { color: colors.textSecondary }]}>Archived Tasks</Text>
+            {archivedTasks.map((task) => (
+              <TouchableOpacity
+                key={task.id}
+                style={[styles.taskCard, styles.archivedCard, { backgroundColor: colors.cardBg }]}
+                onPress={() => navigation.navigate('TaskDetail', { taskId: task.id })}
+              >
+                <View style={styles.taskHeader}>
+                  <Text style={[styles.taskTitle, { color: colors.textSecondary }]}>{task.title}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: '#999' }]}>
+                    <Text style={styles.statusText}>Archived</Text>
+                  </View>
+                </View>
+                {task.details && (
+                  <Text style={[styles.taskDetails, { color: colors.textSecondary }]} numberOfLines={2}>
+                    {task.details}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
       />
     </SafeAreaView>
   );
@@ -246,23 +350,55 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   filters: {
-    flexDirection: 'row',
     padding: 16,
     gap: 12,
   },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   filterButton: {
     flex: 1,
-    padding: 12,
+    padding: 10,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
   },
   filterText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   filterTextActive: {
     color: '#fff',
+  },
+  optionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  sortContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sortButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  sortButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  optionLabel: {
+    fontSize: 13,
   },
   list: {
     padding: 16,
@@ -335,6 +471,19 @@ const styles = StyleSheet.create({
   },
   emptySubtext: {
     fontSize: 14,
+  },
+  archivedSection: {
+    marginTop: 24,
+    paddingTop: 24,
+    borderTopWidth: 1,
+  },
+  archivedTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  archivedCard: {
+    opacity: 0.7,
   },
 });
 

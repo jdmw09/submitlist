@@ -25,6 +25,9 @@ import {
   deleteTaskGroup,
   addGroupMembers,
   removeGroupMember,
+  // Organization Settings
+  getOrganizationSettings,
+  updateOrganizationSettings,
 } from '../controllers/organizationController';
 import { authenticateToken } from '../middleware/auth';
 
@@ -65,5 +68,9 @@ router.put('/:organizationId/groups/:groupId', updateTaskGroup);
 router.delete('/:organizationId/groups/:groupId', deleteTaskGroup);
 router.post('/:organizationId/groups/:groupId/members', addGroupMembers);
 router.delete('/:organizationId/groups/:groupId/members/:userId', removeGroupMember);
+
+// Organization settings
+router.get('/:organizationId/settings', getOrganizationSettings);
+router.put('/:organizationId/settings', updateOrganizationSettings);
 
 export default router;

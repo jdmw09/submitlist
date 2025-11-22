@@ -119,6 +119,21 @@ export const organizationAPI = {
 
   getGroups: (organizationId: number) =>
     api.get(`/organizations/${organizationId}/groups`),
+
+  // Organization settings
+  getSettings: (organizationId: number) =>
+    api.get(`/organizations/${organizationId}/settings`),
+
+  updateSettings: (
+    organizationId: number,
+    settings: {
+      defaultTaskSort?: 'due_date' | 'priority';
+      hideCompletedTasks?: boolean;
+      autoArchiveEnabled?: boolean;
+      autoArchiveAfterDays?: number;
+      archiveSchedule?: 'daily' | 'weekly_sunday' | 'weekly_monday';
+    }
+  ) => api.put(`/organizations/${organizationId}/settings`, settings),
 };
 
 // Task API
@@ -157,6 +172,19 @@ export const taskAPI = {
 
   getAuditLogs: (taskId: number) =>
     api.get(`/tasks/${taskId}/audit-logs`),
+
+  // Task copy and archive
+  copy: (taskId: number, data?: { title?: string; endDate?: string; assignedUserIds?: number[]; groupId?: number }) =>
+    api.post(`/tasks/${taskId}/copy`, data),
+
+  archive: (taskId: number) =>
+    api.post(`/tasks/${taskId}/archive`),
+
+  unarchive: (taskId: number) =>
+    api.post(`/tasks/${taskId}/unarchive`),
+
+  getArchived: (organizationId: number) =>
+    api.get(`/tasks/organization/${organizationId}/archived`),
 };
 
 // Notification API

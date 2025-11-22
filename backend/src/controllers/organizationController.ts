@@ -1100,3 +1100,127 @@ export const removeGroupMember = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+// ===== ORGANIZATION SETTINGS =====
+
+/**
+ * GET /api/organizations/:organizationId/settings
+ * Get organization settings
+ */
+export const getOrganizationSettings = async (req: AuthRequest, res: Response) => {
+  try {
+    const { organizationId } = req.params;
+    const userId = req.user!.id;
+
+    // Verify user is a member
+    const memberCheck = await query(
+      'SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2',
+      [organizationId, userId]
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'You are not a member of this organization' });
+    }
+
+    // Get or create settings
+    let settingsResult = await query(
+      'SELECT * FROM organization_settings WHERE organization_id = $1',
+      [organizationId]
+    );
+
+    // Create default settings if they don't exist
+    if (settingsResult.rows.length === 0) {
+      settingsResult = await query(
+        `INSERT INTO organization_settings (organization_id)
+         VALUES ($1)
+         RETURNING *`,
+        [organizationId]
+      );
+    }
+
+    res.json({ settings: settingsResult.rows[0] });
+  } catch (error) {
+    console.error('Get organization settings error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * PUT /api/organizations/:organizationId/settings
+ * Update organization settings (Admin only)
+ */
+export const updateOrganizationSettings = async (req: AuthRequest, res: Response) => {
+  try {
+    const { organizationId } = req.params;
+    const {
+      defaultTaskSort,
+      hideCompletedTasks,
+      autoArchiveEnabled,
+      autoArchiveAfterDays,
+      archiveSchedule
+    } = req.body;
+    const userId = req.user!.id;
+
+    // Verify user is admin
+    const memberCheck = await query(
+      'SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2',
+      [organizationId, userId]
+    );
+
+    if (memberCheck.rows.length === 0 || memberCheck.rows[0].role !== 'admin') {
+      return res.status(403).json({ error: 'Only organization admins can update settings' });
+    }
+
+    // Validate inputs
+    if (defaultTaskSort && !['due_date', 'priority'].includes(defaultTaskSort)) {
+      return res.status(400).json({ error: 'Invalid sort option. Must be "due_date" or "priority"' });
+    }
+
+    if (archiveSchedule && !['daily', 'weekly_sunday', 'weekly_monday'].includes(archiveSchedule)) {
+      return res.status(400).json({ error: 'Invalid archive schedule. Must be "daily", "weekly_sunday", or "weekly_monday"' });
+    }
+
+    if (autoArchiveAfterDays !== undefined && autoArchiveAfterDays !== null) {
+      if (!Number.isInteger(autoArchiveAfterDays) || autoArchiveAfterDays < 1 || autoArchiveAfterDays > 365) {
+        return res.status(400).json({ error: 'Auto archive days must be between 1 and 365' });
+      }
+    }
+
+    // Upsert settings
+    const result = await query(
+      `INSERT INTO organization_settings (
+        organization_id,
+        default_task_sort,
+        hide_completed_tasks,
+        auto_archive_enabled,
+        auto_archive_after_days,
+        archive_schedule,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+      ON CONFLICT (organization_id) DO UPDATE SET
+        default_task_sort = COALESCE($2, organization_settings.default_task_sort),
+        hide_completed_tasks = COALESCE($3, organization_settings.hide_completed_tasks),
+        auto_archive_enabled = COALESCE($4, organization_settings.auto_archive_enabled),
+        auto_archive_after_days = COALESCE($5, organization_settings.auto_archive_after_days),
+        archive_schedule = COALESCE($6, organization_settings.archive_schedule),
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING *`,
+      [
+        organizationId,
+        defaultTaskSort || 'due_date',
+        hideCompletedTasks ?? false,
+        autoArchiveEnabled ?? false,
+        autoArchiveAfterDays ?? 7,
+        archiveSchedule || 'daily'
+      ]
+    );
+
+    res.json({
+      message: 'Settings updated successfully',
+      settings: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Update organization settings error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};

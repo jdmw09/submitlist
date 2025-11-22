@@ -14,6 +14,11 @@ import {
   getTaskAssignees,
   removeTaskAssignee,
   completeTaskByAssignee,
+  // Task copy and archive
+  copyTask,
+  archiveTask,
+  unarchiveTask,
+  getArchivedTasks,
 } from '../controllers/taskController';
 import {
   addCompletion,
@@ -34,11 +39,15 @@ router.use(authenticateToken);
 // Task routes
 router.post('/', createTask);
 router.get('/organization/:organizationId', getTasks);
+router.get('/organization/:organizationId/archived', getArchivedTasks);
 router.get('/:taskId', getTask);
 router.put('/:taskId', updateTask);
 router.delete('/:taskId', deleteTask);
 router.post('/:taskId/submit', submitTask);
 router.post('/:taskId/review', reviewTask);
+router.post('/:taskId/copy', copyTask);
+router.post('/:taskId/archive', archiveTask);
+router.post('/:taskId/unarchive', unarchiveTask);
 
 // Phase 1: Multi-assignee routes
 router.post('/:taskId/assignees', addTaskAssignees);

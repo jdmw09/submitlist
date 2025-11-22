@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
+  Switch,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
@@ -25,6 +26,14 @@ interface Member {
   joined_at: string;
 }
 
+interface TaskSettings {
+  default_task_sort: 'due_date' | 'priority';
+  hide_completed_tasks: boolean;
+  auto_archive_enabled: boolean;
+  auto_archive_after_days: number;
+  archive_schedule: 'daily' | 'weekly_sunday' | 'weekly_monday';
+}
+
 const OrganizationSettingsScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const [orgName, setOrgName] = useState('');
@@ -34,9 +43,18 @@ const OrganizationSettingsScreen = ({ navigation }: any) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('member');
+  const [taskSettings, setTaskSettings] = useState<TaskSettings>({
+    default_task_sort: 'due_date',
+    hide_completed_tasks: false,
+    auto_archive_enabled: false,
+    auto_archive_after_days: 7,
+    archive_schedule: 'daily',
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
     loadOrganizationDetails();
+    loadTaskSettings();
   }, []);
 
   const loadOrganizationDetails = async () => {
@@ -58,6 +76,50 @@ const OrganizationSettingsScreen = ({ navigation }: any) => {
       Alert.alert('Error', error.response?.data?.error || 'Failed to load organization details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTaskSettings = async () => {
+    const storedOrg = await AsyncStorage.getItem('selectedOrganization');
+    if (!storedOrg) return;
+    const org = JSON.parse(storedOrg);
+
+    try {
+      const response = await organizationAPI.getSettings(org.id);
+      const settings = response.data.settings;
+      if (settings) {
+        setTaskSettings({
+          default_task_sort: settings.default_task_sort || 'due_date',
+          hide_completed_tasks: settings.hide_completed_tasks || false,
+          auto_archive_enabled: settings.auto_archive_enabled || false,
+          auto_archive_after_days: settings.auto_archive_after_days || 7,
+          archive_schedule: settings.archive_schedule || 'daily',
+        });
+      }
+    } catch (error) {
+      console.log('Failed to load task settings:', error);
+    }
+  };
+
+  const saveTaskSettings = async () => {
+    const storedOrg = await AsyncStorage.getItem('selectedOrganization');
+    if (!storedOrg) return;
+    const org = JSON.parse(storedOrg);
+
+    setSavingSettings(true);
+    try {
+      await organizationAPI.updateSettings(org.id, {
+        defaultTaskSort: taskSettings.default_task_sort,
+        hideCompletedTasks: taskSettings.hide_completed_tasks,
+        autoArchiveEnabled: taskSettings.auto_archive_enabled,
+        autoArchiveAfterDays: taskSettings.auto_archive_after_days,
+        archiveSchedule: taskSettings.archive_schedule,
+      });
+      Alert.alert('Success', 'Task settings updated successfully');
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to update settings');
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -203,6 +265,89 @@ const OrganizationSettingsScreen = ({ navigation }: any) => {
             </View>
           )}
         </View>
+
+        {isAdmin && (
+          <View style={[styles.section, { backgroundColor: colors.cardBg }]}>
+            <View style={[styles.sectionHeader, { borderBottomColor: colors.borderMedium }]}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Task Settings</Text>
+            </View>
+
+            <View style={styles.settingRow}>
+              <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Default Sort Order</Text>
+              <View style={[styles.settingPicker, { backgroundColor: colors.bgPrimary, borderColor: colors.borderMedium }]}>
+                <Picker
+                  selectedValue={taskSettings.default_task_sort}
+                  onValueChange={(value) => setTaskSettings({ ...taskSettings, default_task_sort: value })}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Due Date" value="due_date" />
+                  <Picker.Item label="Priority" value="priority" />
+                </Picker>
+              </View>
+            </View>
+
+            <View style={styles.settingRow}>
+              <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Hide Completed Tasks</Text>
+              <Switch
+                value={taskSettings.hide_completed_tasks}
+                onValueChange={(value) => setTaskSettings({ ...taskSettings, hide_completed_tasks: value })}
+                trackColor={{ false: colors.borderMedium, true: colors.primary }}
+              />
+            </View>
+
+            <View style={styles.settingRow}>
+              <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Auto-Archive Completed Tasks</Text>
+              <Switch
+                value={taskSettings.auto_archive_enabled}
+                onValueChange={(value) => setTaskSettings({ ...taskSettings, auto_archive_enabled: value })}
+                trackColor={{ false: colors.borderMedium, true: colors.primary }}
+              />
+            </View>
+
+            {taskSettings.auto_archive_enabled && (
+              <>
+                <View style={styles.settingRow}>
+                  <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Archive After (Days)</Text>
+                  <View style={[styles.settingPicker, { backgroundColor: colors.bgPrimary, borderColor: colors.borderMedium }]}>
+                    <Picker
+                      selectedValue={taskSettings.auto_archive_after_days}
+                      onValueChange={(value) => setTaskSettings({ ...taskSettings, auto_archive_after_days: value })}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="1 day" value={1} />
+                      <Picker.Item label="3 days" value={3} />
+                      <Picker.Item label="7 days" value={7} />
+                      <Picker.Item label="14 days" value={14} />
+                      <Picker.Item label="30 days" value={30} />
+                    </Picker>
+                  </View>
+                </View>
+
+                <View style={styles.settingRow}>
+                  <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Archive Schedule</Text>
+                  <View style={[styles.settingPicker, { backgroundColor: colors.bgPrimary, borderColor: colors.borderMedium }]}>
+                    <Picker
+                      selectedValue={taskSettings.archive_schedule}
+                      onValueChange={(value) => setTaskSettings({ ...taskSettings, archive_schedule: value })}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="Daily" value="daily" />
+                      <Picker.Item label="Weekly (Sunday)" value="weekly_sunday" />
+                      <Picker.Item label="Weekly (Monday)" value="weekly_monday" />
+                    </Picker>
+                  </View>
+                </View>
+              </>
+            )}
+
+            <Button
+              title={savingSettings ? "Saving..." : "Save Settings"}
+              onPress={saveTaskSettings}
+              disabled={savingSettings}
+              style={styles.saveButton}
+            />
+          </View>
+        )}
 
         <Button
           title="Back to Tasks"
@@ -422,6 +567,27 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  settingLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    flex: 1,
+  },
+  settingPicker: {
+    borderWidth: 1,
+    borderRadius: 8,
+    minWidth: 140,
+  },
+  saveButton: {
+    marginTop: 20,
   },
 });
 
