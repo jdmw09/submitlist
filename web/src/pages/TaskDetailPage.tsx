@@ -345,7 +345,7 @@ const TaskDetailPage: React.FC = () => {
                               id={`file-upload-${req.id}`}
                               type="file"
                               onChange={(e) => handleFileChange(req.id, e)}
-                              accept="image/*,video/*,.heic,.heif,.tiff,.tif,.m4v,.pdf,.doc,.docx"
+                              accept="image/*,video/*,.heic,.heif,.tiff,.tif,.mov,.m4v,.pdf,.doc,.docx"
                               multiple
                             />
                           </div>

@@ -17,8 +17,9 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilt
   const allowedTypes = /jpeg|jpg|png|gif|webp|heic|heif|tiff|tif|mp4|mov|m4v|avi|webm|pdf|doc|docx|csv/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
 
-  // MIME types for Apple formats: image/heic, image/heif, video/x-m4v
-  const allowedMimes = /(image|video)\/(jpeg|jpg|png|gif|webp|heic|heif|tiff|x-tiff|mp4|quicktime|x-m4v|avi|webm|x-msvideo)|(application|text)\/(pdf|msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|csv)/;
+  // MIME types for Apple formats: image/heic, image/heif, video/x-m4v, video/quicktime (mov)
+  // Also allow application/octet-stream as iOS Safari sometimes sends this for video files
+  const allowedMimes = /(image|video)\/(jpeg|jpg|png|gif|webp|heic|heif|tiff|x-tiff|mp4|quicktime|x-m4v|x-quicktime|avi|webm|x-msvideo)|(application)\/(octet-stream|pdf|msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document)|(text)\/(csv|plain)/;
   const mimetype = allowedMimes.test(file.mimetype);
 
   if (mimetype || extname) {
