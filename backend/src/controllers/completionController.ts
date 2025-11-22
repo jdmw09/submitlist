@@ -5,8 +5,35 @@ import path from 'path';
 import fs from 'fs';
 import { compressImage, shouldCompressImage } from '../utils/imageCompressor';
 import { shouldCompressVideo } from '../utils/videoCompressor';
+import { isRawImage, isRawExtension, processRawImage } from '../utils/rawImageConverter';
 import { processVideoInBackground } from '../services/processingJobService';
 import { isBillingEnabled, canUploadFile, trackFileUpload, trackFileDelete } from '../services/billingService';
+
+// Helper function to update completion file path in database
+async function updateCompletionFilePath(completionId: number, oldPath: string, newPath: string): Promise<void> {
+  const completionResult = await query(
+    'SELECT file_path FROM task_completions WHERE id = $1',
+    [completionId]
+  );
+
+  if (completionResult.rows.length > 0) {
+    let filePaths: string[] = [];
+    try {
+      filePaths = JSON.parse(completionResult.rows[0].file_path);
+    } catch {
+      filePaths = [completionResult.rows[0].file_path];
+    }
+
+    const updatedPaths = filePaths.map(p =>
+      p === oldPath ? newPath : p
+    );
+
+    await query(
+      'UPDATE task_completions SET file_path = $1 WHERE id = $2',
+      [JSON.stringify(updatedPaths), completionId]
+    );
+  }
+}
 
 export const addCompletion = async (req: AuthRequest, res: Response) => {
   try {
@@ -81,6 +108,9 @@ export const addCompletion = async (req: AuthRequest, res: Response) => {
             console.error('Image compression failed:', error);
             processedFilePaths.push(`/uploads/${file.filename}`);
           }
+        } else if (isRawImage(file.mimetype) || isRawExtension(file.originalname)) {
+          // RAW images (DNG, CR2, NEF, ARW) - will be converted after completion insert
+          processedFilePaths.push(`/uploads/${file.filename}`);
         } else if (shouldCompressVideo(file.mimetype)) {
           // Store original path for now - will be updated after completion insert
           processedFilePaths.push(`/uploads/${file.filename}`);
@@ -97,8 +127,8 @@ export const addCompletion = async (req: AuthRequest, res: Response) => {
     let finalCompletionType = completionType || 'text';
     if (files && files.length > 0) {
       const ext = path.extname(files[0].filename).toLowerCase();
-      // Image formats including Apple HEIC/HEIF
-      if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.tiff', '.tif'].includes(ext)) {
+      // Image formats including Apple HEIC/HEIF and RAW formats (DNG, CR2, NEF, ARW)
+      if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.tiff', '.tif', '.dng', '.cr2', '.nef', '.arw'].includes(ext)) {
         finalCompletionType = 'image';
       }
       // Video formats including Apple MOV and M4V
@@ -133,6 +163,19 @@ export const addCompletion = async (req: AuthRequest, res: Response) => {
           const fullPath = path.join(__dirname, '../../uploads', file.filename);
           const jobId = processVideoInBackground(parseInt(taskId), completionId, fullPath);
           videoJobIds.push(jobId);
+        }
+      }
+    }
+
+    // Process RAW images (DNG, CR2, NEF, ARW) - convert to JPEG in background
+    if (files && files.length > 0) {
+      for (const file of files) {
+        if (isRawImage(file.mimetype) || isRawExtension(file.originalname)) {
+          const fullPath = path.join(__dirname, '../../uploads', file.filename);
+          // Process RAW image asynchronously (don't await - let it run in background)
+          processRawImage(fullPath, completionId, updateCompletionFilePath)
+            .then(() => console.log(`[RAW] Successfully converted ${file.originalname}`))
+            .catch(err => console.error(`[RAW] Failed to convert ${file.originalname}:`, err));
         }
       }
     }
