@@ -10,6 +10,7 @@ const CreateTaskPage: React.FC = () => {
   const [details, setDetails] = useState('');
   const [requirements, setRequirements] = useState<string[]>(['']);
   const [scheduleType, setScheduleType] = useState<'one_time' | 'daily' | 'weekly' | 'monthly'>('one_time');
+  const [scheduleFrequency, setScheduleFrequency] = useState(1);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [assignedUserIds, setAssignedUserIds] = useState<number[]>([]);
@@ -99,6 +100,7 @@ const CreateTaskPage: React.FC = () => {
         details,
         requirements: validRequirements,
         scheduleType,
+        scheduleFrequency: scheduleType !== 'one_time' ? scheduleFrequency : 1,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         assignedUserIds: assignedUserIds.length > 0 ? assignedUserIds : undefined,
@@ -277,17 +279,35 @@ const CreateTaskPage: React.FC = () => {
               ))}
             </div>
             {scheduleType !== 'one_time' && (
-              <div className="schedule-info">
-                <p>
-                  <strong>Recurring Task:</strong> This task will automatically generate new instances{' '}
-                  {scheduleType === 'daily' && 'every day'}
-                  {scheduleType === 'weekly' && 'every week'}
-                  {scheduleType === 'monthly' && 'every month'}
-                  {startDate && ' starting on the specified start date'}
-                  {endDate && ' and ending on the end date'}.
-                  {!endDate && ' with no end date (continues indefinitely)'}.
-                </p>
-              </div>
+              <>
+                <div className="frequency-row">
+                  <label>Repeat every</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={scheduleFrequency}
+                    onChange={(e) => setScheduleFrequency(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="frequency-input"
+                  />
+                  <span>
+                    {scheduleType === 'daily' && (scheduleFrequency === 1 ? 'day' : 'days')}
+                    {scheduleType === 'weekly' && (scheduleFrequency === 1 ? 'week' : 'weeks')}
+                    {scheduleType === 'monthly' && (scheduleFrequency === 1 ? 'month' : 'months')}
+                  </span>
+                </div>
+                <div className="schedule-info">
+                  <p>
+                    <strong>Recurring Task:</strong> This task will automatically generate new instances{' '}
+                    {scheduleType === 'daily' && (scheduleFrequency === 1 ? 'every day' : `every ${scheduleFrequency} days`)}
+                    {scheduleType === 'weekly' && (scheduleFrequency === 1 ? 'every week' : `every ${scheduleFrequency} weeks`)}
+                    {scheduleType === 'monthly' && (scheduleFrequency === 1 ? 'every month' : `every ${scheduleFrequency} months`)}
+                    {startDate && ' starting on the specified start date'}
+                    {endDate && ' and ending on the end date'}.
+                    {!endDate && ' with no end date (continues indefinitely)'}.
+                  </p>
+                </div>
+              </>
             )}
           </div>
 

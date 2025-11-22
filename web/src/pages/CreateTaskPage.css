@@ -43,19 +43,39 @@
   display: flex;
   gap: 12px;
   margin-bottom: 12px;
+  align-items: flex-start;
 }
 
 .requirement-row textarea {
   flex: 1;
   resize: vertical;
   min-height: 60px;
+  padding: 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.requirement-row textarea::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.requirement-row textarea:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
 
 .btn-remove {
   width: 40px;
   height: 40px;
+  min-width: 40px;
   border-radius: 50%;
-  background: #f44336;
+  background: var(--color-danger-500, #f44336);
   color: white;
   border: none;
   font-size: 24px;
@@ -64,10 +84,12 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
+  margin-top: 10px;
+  transition: background-color 0.2s;
 }
 
 .btn-remove:hover {
-  background: #d32f2f;
+  background: var(--color-danger-600, #d32f2f);
 }
 
 .schedule-options {
@@ -107,6 +129,42 @@
 
 .schedule-option span {
   text-transform: capitalize;
+}
+
+.frequency-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+}
+
+.frequency-row label {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.frequency-input {
+  width: 80px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  font-size: 16px;
+  text-align: center;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+.frequency-input:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.frequency-row span {
+  color: var(--color-text-secondary);
 }
 
 .schedule-info {

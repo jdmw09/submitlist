@@ -62,10 +62,24 @@ export interface TaskCompletion {
   completed_at: string;
 }
 
+export interface TaskComment {
+  id: number;
+  task_id: number;
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  content: string;
+  parent_id?: number;
+  is_edited: boolean;
+  edited_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Notification {
   id: number;
   user_id: number;
-  type: 'task_assigned' | 'task_due_soon' | 'task_completed' | 'task_overdue';
+  type: 'task_assigned' | 'task_due_soon' | 'task_completed' | 'task_overdue' | 'task_comment';
   title: string;
   message?: string;
   task_id?: number;

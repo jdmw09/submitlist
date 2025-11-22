@@ -240,4 +240,19 @@ export const iapAPI = {
   getSubscriptionDetails: () => api.get('/iap/subscription'),
 };
 
+// Comment API
+export const commentAPI = {
+  getComments: (taskId: number) =>
+    api.get(`/tasks/${taskId}/comments`),
+
+  addComment: (taskId: number, content: string, parentId?: number) =>
+    api.post(`/tasks/${taskId}/comments`, { content, parentId }),
+
+  updateComment: (commentId: number, content: string) =>
+    api.put(`/comments/${commentId}`, { content }),
+
+  deleteComment: (commentId: number) =>
+    api.delete(`/comments/${commentId}`),
+};
+
 export default api;

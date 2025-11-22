@@ -11,8 +11,8 @@ import {
   TextInput,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { taskAPI } from '../services/api';
-import { Task, TaskRequirement } from '../types';
+import { taskAPI, commentAPI } from '../services/api';
+import { Task, TaskRequirement, TaskComment } from '../types';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,10 +28,71 @@ const TaskDetailScreen = ({ route, navigation }: any) => {
   const [completionTexts, setCompletionTexts] = useState<{ [key: number]: string }>({});
   const [selectedImages, setSelectedImages] = useState<{ [key: number]: { uri: string; name: string; type: string }[] }>({});
   const [reviewComments, setReviewComments] = useState('');
+  const [comments, setComments] = useState<TaskComment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
 
   useEffect(() => {
     loadTask();
+    loadComments();
   }, []);
+
+  const loadComments = async () => {
+    try {
+      const response = await commentAPI.getComments(taskId);
+      setComments(response.data.comments);
+    } catch (error) {
+      console.error('Failed to load comments:', error);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || submittingComment) return;
+
+    setSubmittingComment(true);
+    try {
+      await commentAPI.addComment(taskId, newComment.trim());
+      setNewComment('');
+      loadComments();
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to add comment');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleUpdateComment = async (commentId: number) => {
+    if (!editingCommentText.trim()) return;
+
+    try {
+      await commentAPI.updateComment(commentId, editingCommentText.trim());
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      loadComments();
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to update comment');
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    Alert.alert('Delete Comment', 'Are you sure you want to delete this comment?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await commentAPI.deleteComment(commentId);
+            loadComments();
+          } catch (error: any) {
+            Alert.alert('Error', error.response?.data?.error || 'Failed to delete comment');
+          }
+        },
+      },
+    ]);
+  };
 
   const loadTask = async () => {
     try {
@@ -546,6 +607,92 @@ const TaskDetailScreen = ({ route, navigation }: any) => {
           />
         </View>
 
+        {/* Comments Section */}
+        <View style={[styles.section, { backgroundColor: colors.cardBg }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            Discussion ({comments.length})
+          </Text>
+
+          {/* Add comment form */}
+          <View style={styles.commentForm}>
+            <TextInput
+              style={[styles.commentInput, { backgroundColor: colors.bgPrimary, borderColor: colors.borderMedium, color: colors.textPrimary }]}
+              value={newComment}
+              onChangeText={setNewComment}
+              placeholder="Add a comment..."
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+            <Button
+              title={submittingComment ? 'Posting...' : 'Post Comment'}
+              onPress={handleAddComment}
+              disabled={!newComment.trim() || submittingComment}
+            />
+          </View>
+
+          {/* Comments list */}
+          {comments.length === 0 ? (
+            <Text style={[styles.noComments, { color: colors.textSecondary }]}>
+              No comments yet. Be the first to comment!
+            </Text>
+          ) : (
+            comments.map((comment) => (
+              <View key={comment.id} style={[styles.commentItem, { backgroundColor: colors.bgPrimary, borderColor: colors.borderMedium }]}>
+                <View style={styles.commentHeader}>
+                  <Text style={[styles.commentAuthor, { color: colors.textPrimary }]}>{comment.user_name}</Text>
+                  <Text style={[styles.commentDate, { color: colors.textSecondary }]}>
+                    {new Date(comment.created_at).toLocaleString()}
+                    {comment.is_edited && ' (edited)'}
+                  </Text>
+                </View>
+
+                {editingCommentId === comment.id ? (
+                  <View style={styles.commentEditForm}>
+                    <TextInput
+                      style={[styles.commentInput, { backgroundColor: colors.cardBg, borderColor: colors.borderMedium, color: colors.textPrimary }]}
+                      value={editingCommentText}
+                      onChangeText={setEditingCommentText}
+                      multiline
+                      numberOfLines={3}
+                      textAlignVertical="top"
+                    />
+                    <View style={styles.commentEditActions}>
+                      <Button
+                        title="Cancel"
+                        onPress={() => setEditingCommentId(null)}
+                        variant="secondary"
+                      />
+                      <Button
+                        title="Save"
+                        onPress={() => handleUpdateComment(comment.id)}
+                      />
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={[styles.commentContent, { color: colors.textPrimary }]}>{comment.content}</Text>
+                    {user && comment.user_id === user.id && (
+                      <View style={styles.commentActions}>
+                        <TouchableOpacity onPress={() => {
+                          setEditingCommentId(comment.id);
+                          setEditingCommentText(comment.content);
+                        }}>
+                          <Text style={[styles.commentActionText, { color: colors.link }]}>Edit</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleDeleteComment(comment.id)}>
+                          <Text style={[styles.commentActionText, { color: '#f44336' }]}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
+            ))
+          )}
+        </View>
+
         {/* Delete section for task creators */}
         {user && task.created_by_id === user.id && (
           <View style={[styles.section, { backgroundColor: colors.cardBg }]}>
@@ -757,6 +904,61 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   reviewButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  // Comment styles
+  commentForm: {
+    marginBottom: 16,
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    minHeight: 80,
+    marginBottom: 12,
+  },
+  noComments: {
+    textAlign: 'center',
+    fontStyle: 'italic',
+    padding: 16,
+  },
+  commentItem: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2196F3',
+  },
+  commentHeader: {
+    marginBottom: 8,
+  },
+  commentAuthor: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  commentDate: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  commentContent: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  commentActions: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 12,
+  },
+  commentActionText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  commentEditForm: {
+    marginTop: 8,
+  },
+  commentEditActions: {
     flexDirection: 'row',
     gap: 12,
   },

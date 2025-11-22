@@ -1,8 +1,8 @@
 # TaskManager - Database Schema Documentation
 
-**Version**: 2.0.0
+**Version**: 2.2.0
 **Database**: PostgreSQL 15
-**Last Updated**: November 20, 2025
+**Last Updated**: November 22, 2025
 
 ---
 
@@ -25,8 +25,8 @@ The TaskManager database uses PostgreSQL with a normalized relational schema. It
 - Audit logging for both admin actions and task operations
 - Email verification and password reset workflows
 
-**Total Tables**: 17
-**Total Indexes**: 40+
+**Total Tables**: 18
+**Total Indexes**: 45+
 
 ---
 
@@ -122,6 +122,35 @@ The TaskManager database uses PostgreSQL with a normalized relational schema. It
 - Organizations are the top-level entity for task management
 - Users can belong to multiple organizations
 - No explicit creator_id (determined by first admin member)
+
+---
+
+### 2a. organization_settings (NEW - v2.2.0)
+
+**Purpose**: Organization-level task display and archive settings.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | SERIAL | PRIMARY KEY | Auto-incrementing settings ID |
+| organization_id | INTEGER | FK(organizations.id), UNIQUE, NOT NULL | Reference to organization |
+| default_task_sort | VARCHAR(20) | NOT NULL, DEFAULT 'due_date' | Default sort: due_date or priority |
+| hide_completed_tasks | BOOLEAN | NOT NULL, DEFAULT false | Hide completed tasks by default |
+| auto_archive_enabled | BOOLEAN | NOT NULL, DEFAULT false | Enable automatic task archiving |
+| auto_archive_after_days | INTEGER | DEFAULT 7 | Days after completion to archive |
+| archive_schedule | VARCHAR(20) | NOT NULL, DEFAULT 'daily' | daily, weekly_sunday, weekly_monday |
+| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Settings creation timestamp |
+| updated_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Last update timestamp |
+
+**Indexes**:
+- `idx_org_settings_org_id` ON organization_id
+
+**Cascade Behavior**:
+- ON DELETE CASCADE: Deleting organization removes settings
+
+**Notes**:
+- One settings record per organization (UNIQUE constraint)
+- Auto-created via trigger when organization is created
+- Only organization admins can modify settings
 
 ---
 
@@ -277,6 +306,7 @@ The TaskManager database uses PostgreSQL with a normalized relational schema. It
 | parent_template_id | INTEGER | FK(tasks.id) | For recurring task instances |
 | is_private | BOOLEAN | DEFAULT false | Private tasks visible to creator only |
 | group_id | INTEGER | FK(task_groups.id) | Optional group assignment |
+| archived_at | TIMESTAMP | NULL | When task was archived (NULL = not archived) |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Task creation timestamp |
 | updated_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Last update timestamp |
 
@@ -288,6 +318,7 @@ The TaskManager database uses PostgreSQL with a normalized relational schema. It
 - `idx_tasks_creator` ON created_by_id
 - `idx_tasks_group` ON group_id
 - `idx_tasks_private` ON is_private
+- `idx_tasks_archived` ON archived_at
 
 **Cascade Behavior**:
 - ON DELETE CASCADE: Deleting organization removes all tasks
@@ -694,6 +725,36 @@ All foreign keys have indexes for efficient JOIN operations.
 **Date**: November 20, 2025
 **Purpose**: Template for promoting first super admin
 **Note**: Contains commented SQL for manual execution
+
+#### 005_billing_and_storage.sql
+**Date**: November 21, 2025
+**Purpose**: Subscription billing and storage tracking
+**Tables Created**:
+- subscription_plans
+- organization_subscriptions
+- storage_usage
+
+#### 006_organization_settings_and_archive.sql (NEW - v2.2.0)
+**Date**: November 22, 2025
+**Purpose**: Task sorting, archive, and organization settings
+
+**Tables Created**:
+- organization_settings
+
+**Columns Added to tasks**:
+- archived_at (TIMESTAMP, NULL)
+
+**Indexes Created**:
+- idx_org_settings_org_id ON organization_settings(organization_id)
+- idx_tasks_archived ON tasks(archived_at)
+- idx_tasks_status_completed ON tasks(status) WHERE status = 'completed'
+- idx_tasks_end_date ON tasks(end_date)
+
+**Triggers Created**:
+- create_org_settings_trigger: Auto-creates settings when organization is created
+
+**Data Migration**:
+- Auto-creates settings for all existing organizations
 
 ---
 

@@ -22,6 +22,7 @@ const CreateTaskScreen = ({ navigation }: any) => {
   const [details, setDetails] = useState('');
   const [requirements, setRequirements] = useState<string[]>(['']);
   const [scheduleType, setScheduleType] = useState<'one_time' | 'daily' | 'weekly' | 'monthly'>('one_time');
+  const [scheduleFrequency, setScheduleFrequency] = useState(1);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [assignedUserIds, setAssignedUserIds] = useState<number[]>([]);
@@ -107,6 +108,7 @@ const CreateTaskScreen = ({ navigation }: any) => {
         details,
         requirements: validRequirements,
         scheduleType,
+        scheduleFrequency: scheduleType !== 'one_time' ? scheduleFrequency : 1,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         assignedUserIds: assignedUserIds.length > 0 ? assignedUserIds : undefined,
@@ -290,18 +292,37 @@ const CreateTaskScreen = ({ navigation }: any) => {
         </View>
 
         {scheduleType !== 'one_time' && (
-          <View style={[styles.scheduleInfo, { backgroundColor: colors.infoBg, borderLeftColor: colors.infoBorder }]}>
-            <Text style={[styles.scheduleInfoText, { color: colors.infoText }]}>
-              <Text style={[styles.scheduleInfoBold, { color: colors.infoText }]}>Recurring Task: </Text>
-              This task will automatically generate new instances{' '}
-              {scheduleType === 'daily' && 'every day'}
-              {scheduleType === 'weekly' && 'every week'}
-              {scheduleType === 'monthly' && 'every month'}
-              {startDate && ' starting on the specified start date'}
-              {endDate && ' and ending on the end date'}.
-              {!endDate && ' with no end date (continues indefinitely)'}.
-            </Text>
-          </View>
+          <>
+            <View style={[styles.frequencyRow, { backgroundColor: colors.cardBg }]}>
+              <Text style={[styles.frequencyLabel, { color: colors.textPrimary }]}>Repeat every</Text>
+              <Input
+                value={String(scheduleFrequency)}
+                onChangeText={(value) => {
+                  const num = parseInt(value) || 1;
+                  setScheduleFrequency(Math.max(1, Math.min(12, num)));
+                }}
+                keyboardType="number-pad"
+                style={styles.frequencyInput}
+              />
+              <Text style={[styles.frequencyUnit, { color: colors.textSecondary }]}>
+                {scheduleType === 'daily' && (scheduleFrequency === 1 ? 'day' : 'days')}
+                {scheduleType === 'weekly' && (scheduleFrequency === 1 ? 'week' : 'weeks')}
+                {scheduleType === 'monthly' && (scheduleFrequency === 1 ? 'month' : 'months')}
+              </Text>
+            </View>
+            <View style={[styles.scheduleInfo, { backgroundColor: colors.infoBg, borderLeftColor: colors.infoBorder }]}>
+              <Text style={[styles.scheduleInfoText, { color: colors.infoText }]}>
+                <Text style={[styles.scheduleInfoBold, { color: colors.infoText }]}>Recurring Task: </Text>
+                This task will automatically generate new instances{' '}
+                {scheduleType === 'daily' && (scheduleFrequency === 1 ? 'every day' : `every ${scheduleFrequency} days`)}
+                {scheduleType === 'weekly' && (scheduleFrequency === 1 ? 'every week' : `every ${scheduleFrequency} weeks`)}
+                {scheduleType === 'monthly' && (scheduleFrequency === 1 ? 'every month' : `every ${scheduleFrequency} months`)}
+                {startDate && ' starting on the specified start date'}
+                {endDate && ' and ending on the end date'}.
+                {!endDate && ' with no end date (continues indefinitely)'}.
+              </Text>
+            </View>
+          </>
         )}
 
         <View style={styles.actions}>
@@ -400,6 +421,25 @@ const styles = StyleSheet.create({
   },
   scheduleButtonTextActive: {
     color: '#fff',
+  },
+  frequencyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 8,
+  },
+  frequencyLabel: {
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  frequencyInput: {
+    width: 60,
+    textAlign: 'center',
+  },
+  frequencyUnit: {
+    fontSize: 14,
   },
   scheduleInfo: {
     marginTop: 16,

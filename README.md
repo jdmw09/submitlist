@@ -9,6 +9,9 @@ A full-stack task management system with scheduled tasks, team collaboration, an
 - Organization/team management with role-based access (admin/member)
 - Task creation with customizable requirements (checklist items)
 - One-time and scheduled tasks (daily, weekly, monthly)
+- **Task sorting** - Sort by due date (default) or priority
+- **Task archive** - Archive completed tasks manually or automatically
+- **Organization settings** - Configurable task display and archive preferences
 - **Media compression** - Auto-compress images (50-70% smaller) and videos (40-60% smaller)
 - File uploads for task completion (images, videos, documents)
 - In-app notifications
@@ -232,13 +235,19 @@ After seeding the database, you can login with:
 - `POST /api/organizations/:id/members` - Add member
 - `PUT /api/organizations/:id/members/:memberId` - Update member role
 - `DELETE /api/organizations/:id/members/:memberId` - Remove member
+- `GET /api/organizations/:id/settings` - Get organization task settings
+- `PUT /api/organizations/:id/settings` - Update organization task settings (admin only)
 
 ### Tasks
 - `POST /api/tasks` - Create task
-- `GET /api/tasks/organization/:orgId` - Get organization tasks
+- `GET /api/tasks/organization/:orgId` - Get organization tasks (supports sort, hideCompleted params)
+- `GET /api/tasks/organization/:orgId/archived` - Get archived tasks
 - `GET /api/tasks/:id` - Get task details
 - `PUT /api/tasks/:id` - Update task
 - `DELETE /api/tasks/:id` - Delete task
+- `POST /api/tasks/:id/copy` - Copy task to create new task
+- `POST /api/tasks/:id/archive` - Archive task
+- `POST /api/tasks/:id/unarchive` - Unarchive task
 - `PUT /api/tasks/requirements/:id` - Update requirement status
 - `POST /api/tasks/:id/completions` - Add completion (with file upload)
 - `GET /api/tasks/:id/completions` - Get completions
@@ -467,6 +476,7 @@ Potential features for future versions:
 - Bulk operations
 - Redis job queue for video processing
 - CDN integration for file serving
+- Task priority levels (high/medium/low)
 
 ## License
 

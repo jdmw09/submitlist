@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { taskAPI } from '../services/api';
-import { Task, TaskRequirement } from '../types';
+import { taskAPI, commentAPI } from '../services/api';
+import { Task, TaskRequirement, TaskComment } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import './TaskDetailPage.css';
@@ -17,12 +17,71 @@ const TaskDetailPage: React.FC = () => {
   const [selectedFiles, setSelectedFiles] = useState<{ [key: number]: File[] }>({});
   const [reviewComments, setReviewComments] = useState('');
   const [userOrgRole, setUserOrgRole] = useState<'admin' | 'member' | null>(null);
+  const [comments, setComments] = useState<TaskComment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
 
   useEffect(() => {
     if (id) {
       loadTask();
+      loadComments();
     }
   }, [id]);
+
+  const loadComments = async () => {
+    try {
+      const response = await commentAPI.getComments(Number(id));
+      setComments(response.data.comments);
+    } catch (error) {
+      console.error('Failed to load comments:', error);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || submittingComment) return;
+
+    setSubmittingComment(true);
+    try {
+      await commentAPI.addComment(Number(id), newComment.trim());
+      setNewComment('');
+      loadComments();
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to add comment');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleUpdateComment = async (commentId: number) => {
+    if (!editingCommentText.trim()) return;
+
+    try {
+      await commentAPI.updateComment(commentId, editingCommentText.trim());
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      loadComments();
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to update comment');
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    if (!window.confirm('Delete this comment?')) return;
+
+    try {
+      await commentAPI.deleteComment(commentId);
+      loadComments();
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to delete comment');
+    }
+  };
+
+  const startEditingComment = (comment: TaskComment) => {
+    setEditingCommentId(comment.id);
+    setEditingCommentText(comment.content);
+  };
 
   const loadTask = async () => {
     try {
@@ -483,6 +542,93 @@ const TaskDetailPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Comments Section */}
+        <div className="card">
+          <h3>Discussion ({comments.length})</h3>
+
+          {/* Add comment form */}
+          <div className="comment-form">
+            <textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Add a comment..."
+              rows={3}
+              className="comment-input"
+            />
+            <button
+              className="btn btn-primary"
+              onClick={handleAddComment}
+              disabled={!newComment.trim() || submittingComment}
+            >
+              {submittingComment ? 'Posting...' : 'Post Comment'}
+            </button>
+          </div>
+
+          {/* Comments list */}
+          <div className="comments-list">
+            {comments.length === 0 ? (
+              <p className="no-comments">No comments yet. Be the first to comment!</p>
+            ) : (
+              comments.map((comment) => (
+                <div key={comment.id} className="comment-item">
+                  <div className="comment-header">
+                    <strong className="comment-author">{comment.user_name}</strong>
+                    <span className="comment-date">
+                      {new Date(comment.created_at).toLocaleString()}
+                      {comment.is_edited && <span className="edited-label"> (edited)</span>}
+                    </span>
+                  </div>
+
+                  {editingCommentId === comment.id ? (
+                    <div className="comment-edit-form">
+                      <textarea
+                        value={editingCommentText}
+                        onChange={(e) => setEditingCommentText(e.target.value)}
+                        rows={3}
+                        className="comment-input"
+                      />
+                      <div className="comment-edit-actions">
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setEditingCommentId(null)}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => handleUpdateComment(comment.id)}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="comment-content">{comment.content}</p>
+                      {user && comment.user_id === user.id && (
+                        <div className="comment-actions">
+                          <button
+                            className="btn-link"
+                            onClick={() => startEditingComment(comment)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn-link btn-link-danger"
+                            onClick={() => handleDeleteComment(comment.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
         {/* Delete section for task creators */}
         {user && task.created_by_id === user.id && (

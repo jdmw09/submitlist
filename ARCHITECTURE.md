@@ -1,7 +1,7 @@
 # TaskManager - Architecture Overview
 
-**Version**: 2.0.0
-**Last Updated**: November 20, 2025
+**Version**: 2.2.0
+**Last Updated**: November 22, 2025
 
 ---
 
@@ -80,6 +80,7 @@
 - Email service (Mailgun)
 - File storage (local filesystem)
 - Task scheduling (node-cron)
+- Archive task service (auto-archive cron)
 
 ---
 
@@ -274,7 +275,9 @@ backend/
 │   │   └── db.ts                   # Connection pool
 │   ├── services/                   # External services
 │   │   ├── emailService.ts         # Mailgun integration
-│   │   └── fileService.ts          # File upload handling
+│   │   ├── fileService.ts          # File upload handling
+│   │   ├── scheduledTaskService.ts # Recurring task generation
+│   │   └── archiveTaskService.ts   # Auto-archive cron service
 │   └── types/                      # TypeScript types
 │       └── express.d.ts            # Extended Express types
 ```
@@ -384,6 +387,33 @@ web/
 9. Frontend refreshes user list
 ```
 
+### Task Archive Flow
+
+```
+1. Manual Archive:
+   Admin clicks "Archive" on completed task
+   ↓
+2. Frontend → POST /api/tasks/:id/archive
+   ↓
+3. Backend sets archived_at timestamp
+   ↓
+4. Task hidden from active task list
+   ↓
+5. Task visible in archived tasks view
+
+Auto-Archive (Cron):
+1. archiveTaskService runs on schedule (daily/weekly)
+   ↓
+2. Queries organization_settings for auto_archive_enabled
+   ↓
+3. For each enabled org, finds completed tasks
+   older than auto_archive_after_days
+   ↓
+4. Bulk updates archived_at timestamp
+   ↓
+5. Logs archived task count per organization
+```
+
 ### Email Verification Flow
 
 ```
@@ -463,6 +493,8 @@ super_admin > admin > member
 - Org admin can manage org members
 - Org admin can create/edit tasks
 - Org admin can approve/reject tasks
+- Org admin can manage organization settings (task display, archive preferences)
+- Org admin can archive/unarchive tasks
 
 ### Password Security
 
@@ -603,6 +635,19 @@ pm2 start dist/index.js --name taskmanager-backend
 - Log rotation
 - Environment variables from .env
 - Startup script for server reboot
+
+### Scheduled Services (node-cron)
+
+**Scheduled Task Service**:
+- Runs daily at midnight
+- Generates new instances for recurring tasks (daily/weekly/monthly)
+- Creates tasks based on schedule_type and schedule_frequency
+
+**Archive Task Service**:
+- Runs based on organization settings (daily at 2 AM, or weekly on Sunday/Monday)
+- Checks each organization's auto_archive_enabled setting
+- Archives completed tasks older than auto_archive_after_days
+- Logs results for monitoring
 
 ---
 
@@ -935,6 +980,37 @@ export const taskAPI = {
 **Trade-offs**:
 - Larger database size
 - Must filter deleted records in queries
+
+### 8. Why Organization-Level Settings for Task Display?
+
+**Chosen**: Per-organization settings stored in organization_settings table
+
+**Reasons**:
+- Different teams have different workflows
+- Admins can control default behavior for their team
+- Settings persist across sessions and users
+- Easy to extend with new preferences
+
+**Settings Include**:
+- default_task_sort: 'due_date' or 'priority'
+- hide_completed_tasks: Boolean
+- auto_archive_enabled: Boolean
+- auto_archive_after_days: Number (default 7)
+- archive_schedule: 'daily', 'weekly_sunday', 'weekly_monday'
+
+### 9. Why Separate Archive vs Delete for Tasks?
+
+**Chosen**: Archive feature with archived_at timestamp
+
+**Reasons**:
+- Tasks can be restored (unarchive)
+- Historical data preserved for reporting
+- Reduces clutter without losing information
+- Auto-archive automates cleanup
+
+**Trade-offs**:
+- Additional UI for viewing archived tasks
+- Need to filter archived tasks from active queries
 
 ---
 

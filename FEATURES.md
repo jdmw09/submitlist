@@ -1,7 +1,7 @@
 # TaskManager - Complete Feature Documentation
 
-**Version**: 2.0.0  
-**Last Updated**: November 20, 2025
+**Version**: 2.2.0
+**Last Updated**: November 22, 2025
 
 ---
 
@@ -347,18 +347,112 @@
 
 ### Task Endpoints
 
-**POST /api/tasks** - Create task  
-**GET /api/tasks** - List tasks (filtered by org, status)  
-**GET /api/tasks/:id** - Get task details  
-**PUT /api/tasks/:id** - Update task  
-**DELETE /api/tasks/:id** - Delete task  
-**PUT /api/tasks/requirements/:id** - Mark requirement complete  
-**POST /api/tasks/:id/completions** - Submit completion  
-**GET /api/tasks/:id/completions** - List completions  
-**DELETE /api/tasks/completions/:id** - Delete completion  
-**POST /api/tasks/:id/submit** - Submit for review  
-**POST /api/tasks/:id/review** - Review task (approve/reject)  
+**POST /api/tasks** - Create task
+**GET /api/tasks** - List tasks (filtered by org, status)
+**GET /api/tasks/:id** - Get task details
+**PUT /api/tasks/:id** - Update task
+**DELETE /api/tasks/:id** - Delete task
+**PUT /api/tasks/requirements/:id** - Mark requirement complete
+**POST /api/tasks/:id/completions** - Submit completion
+**GET /api/tasks/:id/completions** - List completions
+**DELETE /api/tasks/completions/:id** - Delete completion
+**POST /api/tasks/:id/submit** - Submit for review
+**POST /api/tasks/:id/review** - Review task (approve/reject)
 **GET /api/tasks/:id/audit-logs** - View task history
+**POST /api/tasks/:id/copy** - Copy task to create new task
+**POST /api/tasks/:id/archive** - Archive task
+**POST /api/tasks/:id/unarchive** - Unarchive task
+**GET /api/tasks/organization/:orgId/archived** - Get archived tasks
+
+---
+
+## Task Sorting & Display (NEW - v2.2.0)
+
+### Task Sorting
+- **Sort by Due Date** (default): Tasks ordered by end_date ascending, null dates last
+- **Sort by Priority**: Tasks ordered by status priority (overdue → in_progress → pending → submitted → completed)
+- User can toggle between sort modes on task list
+- Organization admins can set default sort order in settings
+
+### Hide Completed Tasks
+- Toggle to hide/show completed tasks on task list
+- Reduces visual clutter when focusing on active work
+- Setting persists per session, with org-level default
+
+### Task Filtering
+- **All Tasks**: View all organization tasks
+- **My Tasks**: View only tasks assigned to current user
+- **Archived**: Toggle to show archived tasks section
+
+---
+
+## Task Archive (NEW - v2.2.0)
+
+### Manual Archive
+- Any task can be archived by organization members
+- Archived tasks are hidden from main task list
+- Archived tasks can be unarchived at any time
+- Archive status tracked via `archived_at` timestamp
+
+### Auto-Archive
+- Organization admins can enable automatic archiving
+- **Archive After**: 1, 3, 7, 14, or 30 days after completion
+- **Schedule Options**:
+  - **Daily**: Runs at 1 AM every day
+  - **Weekly (Sunday)**: Runs at 2 AM every Sunday
+  - **Weekly (Monday)**: Runs at 2 AM every Monday
+- Only archives tasks with `status = 'completed'`
+- Cron-based background service (`archiveTaskService.ts`)
+
+### Archive Endpoints
+**POST /api/tasks/:id/archive** - Archive a task
+**POST /api/tasks/:id/unarchive** - Restore archived task
+**GET /api/tasks/organization/:orgId/archived** - List archived tasks
+
+---
+
+## Organization Settings (NEW - v2.2.0)
+
+### Task Display Settings
+Organization admins can configure default task display preferences:
+
+| Setting | Options | Default | Description |
+|---------|---------|---------|-------------|
+| default_task_sort | due_date, priority | due_date | Default sort order for task list |
+| hide_completed_tasks | true, false | false | Hide completed tasks by default |
+| auto_archive_enabled | true, false | false | Enable automatic task archiving |
+| auto_archive_after_days | 1, 3, 7, 14, 30 | 7 | Days after completion to archive |
+| archive_schedule | daily, weekly_sunday, weekly_monday | daily | When auto-archive runs |
+
+### Settings Endpoints
+**GET /api/organizations/:id/settings** - Get organization settings
+**PUT /api/organizations/:id/settings** - Update settings (admin only)
+
+### Settings UI
+- Web: Organization Settings page with Task Settings section
+- Mobile: Organization Settings screen with Task Settings section
+- Only visible to organization admins
+
+---
+
+## Task Copy (NEW - v2.2.0)
+
+### Copy Task Feature
+- Create a new task from an existing task
+- Copies: title, details, requirements, schedule settings
+- Optional: new title, new due date, new assignees, new group
+- Useful for recurring workflows and task templates
+
+### Copy Endpoint
+**POST /api/tasks/:id/copy**
+```json
+{
+  "title": "New Task Title (optional)",
+  "endDate": "2025-12-31 (optional)",
+  "assignedUserIds": [1, 2, 3] (optional),
+  "groupId": 5 (optional)
+}
+```
 
 ---
 
@@ -550,6 +644,10 @@ X-XSS-Protection: 1; mode=block
 - Multi-organization membership
 - Task creation and management
 - Task completions and reviews
+- **Task sorting (due date/priority)** (v2.2.0)
+- **Task archive (manual + auto)** (v2.2.0)
+- **Task copy** (v2.2.0)
+- **Organization task settings** (v2.2.0)
 - Audit logging
 - Email system (Mailgun)
 - Notifications
@@ -559,7 +657,7 @@ X-XSS-Protection: 1; mode=block
 - Responsive design
 
 ### 🚧 In Development
-- None (v2.0.0 complete)
+- None (v2.2.0 complete)
 
 ### 📋 Planned Features
 - Two-factor authentication (2FA)
@@ -572,3 +670,4 @@ X-XSS-Protection: 1; mode=block
 - Webhooks
 - API rate limiting
 - Activity feed
+- Task priority levels (high/medium/low)

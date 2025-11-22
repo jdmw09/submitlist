@@ -12,6 +12,7 @@ import notificationRoutes from './routes/notificationRoutes';
 import processingRoutes from './routes/processingRoutes';
 import billingRoutes from './routes/billingRoutes';
 import iapRoutes from './routes/iapRoutes';
+import commentRoutes from './routes/commentRoutes';
 import { startScheduledTaskService } from './services/scheduledTaskService';
 import { startFileRetentionService } from './services/fileRetentionService';
 import { startArchiveTaskService } from './services/archiveTaskService';
@@ -56,6 +57,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/processing', processingRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/iap', iapRoutes);
+app.use('/api', commentRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -75,6 +77,7 @@ app.get('/', (req, res) => {
       notifications: '/api/notifications',
       billing: '/api/billing',
       iap: '/api/iap',
+      comments: '/api/tasks/:taskId/comments',
     },
   });
 });
