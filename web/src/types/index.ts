@@ -34,6 +34,7 @@ export interface Task {
   completions?: TaskCompletion[];
   total_requirements?: number;
   completed_requirements?: number;
+  archived_at?: string;
   created_at: string;
   updated_at: string;
 }
