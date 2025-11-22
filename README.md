@@ -9,6 +9,8 @@ A full-stack task management system with scheduled tasks, team collaboration, an
 - Organization/team management with role-based access (admin/member)
 - Task creation with customizable requirements (checklist items)
 - One-time and scheduled tasks (daily, weekly, monthly)
+- **Task comments** - Threaded discussions on tasks with notifications
+- **Enhanced recurring tasks** - Configurable frequency (every N days/weeks/months)
 - **Task sorting** - Sort by due date (default) or priority
 - **Task archive** - Archive completed tasks manually or automatically
 - **Organization settings** - Configurable task display and archive preferences
@@ -252,6 +254,10 @@ After seeding the database, you can login with:
 - `POST /api/tasks/:id/completions` - Add completion (with file upload)
 - `GET /api/tasks/:id/completions` - Get completions
 - `DELETE /api/tasks/completions/:id` - Delete completion
+- `GET /api/tasks/:taskId/comments` - Get task comments
+- `POST /api/tasks/:taskId/comments` - Add comment
+- `PUT /api/comments/:commentId` - Update own comment
+- `DELETE /api/comments/:commentId` - Delete own comment
 
 ### Notifications
 - `GET /api/notifications` - Get user notifications
@@ -305,9 +311,11 @@ After seeding the database, you can login with:
 ### Scheduled Tasks
 
 Tasks with schedule types will automatically generate new instances:
-- **Daily:** Creates a new task every day
-- **Weekly:** Creates a new task on the same day each week
-- **Monthly:** Creates a new task on the same date each month
+- **Daily:** Creates a new task every day (or every N days)
+- **Weekly:** Creates a new task on the same day each week (or every N weeks)
+- **Monthly:** Creates a new task on the same date each month (or every N months)
+
+Configure the frequency when creating a task (e.g., "every 2 weeks" or "every 3 days").
 
 The scheduled task service runs at midnight daily (managed by cron job in the backend).
 
@@ -464,12 +472,11 @@ Both options include:
 ## Future Enhancements
 
 Potential features for future versions:
-- Task comments and discussions
 - Calendar view for tasks
 - Task dependencies
 - Analytics and reporting
 - Real-time collaboration (WebSockets)
-- Email notifications
+- Email notifications for comments
 - Push notifications (FCM integration)
 - File versioning
 - Task templates
@@ -477,6 +484,7 @@ Potential features for future versions:
 - Redis job queue for video processing
 - CDN integration for file serving
 - Task priority levels (high/medium/low)
+- Two-factor authentication (2FA)
 
 ## License
 

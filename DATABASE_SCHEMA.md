@@ -1,6 +1,6 @@
 # TaskManager - Database Schema Documentation
 
-**Version**: 2.2.0
+**Version**: 2.3.0
 **Database**: PostgreSQL 15
 **Last Updated**: November 22, 2025
 
@@ -25,8 +25,8 @@ The TaskManager database uses PostgreSQL with a normalized relational schema. It
 - Audit logging for both admin actions and task operations
 - Email verification and password reset workflows
 
-**Total Tables**: 18
-**Total Indexes**: 45+
+**Total Tables**: 19
+**Total Indexes**: 50+
 
 ---
 
@@ -307,6 +307,7 @@ The TaskManager database uses PostgreSQL with a normalized relational schema. It
 | is_private | BOOLEAN | DEFAULT false | Private tasks visible to creator only |
 | group_id | INTEGER | FK(task_groups.id) | Optional group assignment |
 | archived_at | TIMESTAMP | NULL | When task was archived (NULL = not archived) |
+| last_generated_at | TIMESTAMP | NULL | Last time recurring instance was generated (v2.3.0) |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Task creation timestamp |
 | updated_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Last update timestamp |
 
@@ -406,6 +407,40 @@ The TaskManager database uses PostgreSQL with a normalized relational schema. It
 
 ---
 
+### 11a. task_comments (NEW - v2.3.0)
+
+**Purpose**: Threaded comment discussions on tasks.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | SERIAL | PRIMARY KEY | Auto-incrementing comment ID |
+| task_id | INTEGER | FK(tasks.id), NOT NULL | Reference to task |
+| user_id | INTEGER | FK(users.id), NOT NULL | Comment author |
+| content | TEXT | NOT NULL | Comment content |
+| parent_id | INTEGER | FK(task_comments.id) | For threaded replies (NULL = top-level) |
+| is_edited | BOOLEAN | DEFAULT false | Whether comment has been edited |
+| edited_at | TIMESTAMP | NULL | When comment was last edited |
+| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Comment creation timestamp |
+| updated_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Last update timestamp |
+
+**Indexes**:
+- `idx_task_comments_task` ON task_id
+- `idx_task_comments_user` ON user_id
+- `idx_task_comments_parent` ON parent_id
+- `idx_task_comments_created` ON created_at DESC
+
+**Cascade Behavior**:
+- ON DELETE CASCADE: Deleting task removes all comments
+- ON DELETE CASCADE: Deleting user removes their comments
+- ON DELETE CASCADE: Deleting parent comment removes replies
+
+**Notes**:
+- Threading via self-referential parent_id
+- Users can only edit/delete their own comments
+- Notifications sent on new comments
+
+---
+
 ### 12. task_reviews
 
 **Purpose**: Task creator feedback on submitted tasks (approve/reject).
@@ -452,6 +487,7 @@ The TaskManager database uses PostgreSQL with a normalized relational schema. It
 - task_submitted
 - task_approved
 - task_rejected
+- task_comment (NEW - v2.3.0)
 
 **Indexes**:
 - `idx_notifications_user_id` ON user_id
@@ -755,6 +791,27 @@ All foreign keys have indexes for efficient JOIN operations.
 
 **Data Migration**:
 - Auto-creates settings for all existing organizations
+
+#### 007_task_comments.sql (NEW - v2.3.0)
+**Date**: November 22, 2025
+**Purpose**: Task comments and recurring task improvements
+
+**Tables Created**:
+- task_comments
+
+**Columns Added to tasks**:
+- last_generated_at (TIMESTAMP, NULL)
+
+**Indexes Created**:
+- idx_task_comments_task ON task_comments(task_id)
+- idx_task_comments_user ON task_comments(user_id)
+- idx_task_comments_parent ON task_comments(parent_id)
+- idx_task_comments_created ON task_comments(created_at DESC)
+- idx_tasks_last_generated ON tasks(last_generated_at)
+
+**Notes**:
+- Supports threaded comments via parent_id self-reference
+- last_generated_at improves recurring task tracking accuracy
 
 ---
 

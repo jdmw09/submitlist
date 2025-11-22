@@ -1,6 +1,6 @@
 # TaskManager - Complete Feature Documentation
 
-**Version**: 2.2.0
+**Version**: 2.3.0
 **Last Updated**: November 22, 2025
 
 ---
@@ -342,8 +342,16 @@
 
 **Recurring Tasks**:
 - Daily, weekly, monthly schedules
-- Auto-generation
+- Configurable frequency (every N days/weeks/months)
+- Auto-generation with `last_generated_at` tracking
+- Multi-assignee support when generating instances
 - Independent completion tracking
+
+**Task Comments** (NEW - v2.3.0):
+- Threaded comment discussions on tasks
+- Edit and delete own comments
+- Notifications to task creator/assignees on new comments
+- Audit logging for comment actions
 
 ### Task Endpoints
 
@@ -363,6 +371,12 @@
 **POST /api/tasks/:id/archive** - Archive task
 **POST /api/tasks/:id/unarchive** - Unarchive task
 **GET /api/tasks/organization/:orgId/archived** - Get archived tasks
+
+**Task Comments** (NEW - v2.3.0):
+**GET /api/tasks/:taskId/comments** - Get all comments for a task
+**POST /api/tasks/:taskId/comments** - Add a comment (supports parentId for threading)
+**PUT /api/comments/:commentId** - Update own comment
+**DELETE /api/comments/:commentId** - Delete own comment
 
 ---
 
@@ -396,11 +410,9 @@
 
 ### Auto-Archive
 - Organization admins can enable automatic archiving
-- **Archive After**: 1, 3, 7, 14, or 30 days after completion
-- **Schedule Options**:
-  - **Daily**: Runs at 1 AM every day
-  - **Weekly (Sunday)**: Runs at 2 AM every Sunday
-  - **Weekly (Monday)**: Runs at 2 AM every Monday
+- **Two mutually exclusive modes**:
+  - **By Days**: Archive after 1, 3, 7, 14, or 30 days (runs daily at 1 AM)
+  - **By Schedule**: Archive all completed tasks every Sunday or Monday (runs at 2 AM)
 - Only archives tasks with `status = 'completed'`
 - Cron-based background service (`archiveTaskService.ts`)
 
@@ -432,6 +444,42 @@ Organization admins can configure default task display preferences:
 - Web: Organization Settings page with Task Settings section
 - Mobile: Organization Settings screen with Task Settings section
 - Only visible to organization admins
+
+---
+
+## Task Comments (NEW - v2.3.0)
+
+### Comment Features
+- **Threaded discussions**: Reply to comments with parent_id for threading
+- **Edit comments**: Users can edit their own comments (marked as edited)
+- **Delete comments**: Users can delete their own comments
+- **Notifications**: Task creator and assignees notified on new comments
+- **Audit logging**: All comment actions logged for transparency
+
+### Comment Endpoints
+**GET /api/tasks/:taskId/comments** - Get all comments with user info
+**POST /api/tasks/:taskId/comments** - Add comment (body: `{ content, parentId? }`)
+**PUT /api/comments/:commentId** - Update own comment (body: `{ content }`)
+**DELETE /api/comments/:commentId** - Delete own comment
+
+### Access Control
+- Any organization member can view comments on non-private tasks
+- Private tasks: Only creator and assignees can view/add comments
+- Users can only edit/delete their own comments
+
+---
+
+## Enhanced Recurring Tasks (NEW - v2.3.0)
+
+### Schedule Frequency
+- **Configurable frequency**: Set tasks to repeat every N days/weeks/months
+- **Example**: "Every 2 weeks" or "Every 3 days"
+- **UI controls**: Frequency input on task creation (web and mobile)
+
+### Generation Improvements
+- **last_generated_at**: Accurate tracking of when instances were created
+- **Multi-assignee support**: Copies all assignees when generating new instances
+- **End-of-month handling**: Handles edge cases (e.g., 31st in 30-day months)
 
 ---
 
@@ -517,6 +565,7 @@ Organization admins can configure default task display preferences:
 - Task assignment
 - Task completion
 - Task approval/rejection
+- Task comment (NEW - v2.3.0)
 - Organization invitation
 - Join request (pending approval)
 - Join request (approved/rejected)
@@ -648,6 +697,8 @@ X-XSS-Protection: 1; mode=block
 - **Task archive (manual + auto)** (v2.2.0)
 - **Task copy** (v2.2.0)
 - **Organization task settings** (v2.2.0)
+- **Task comments/discussions** (v2.3.0)
+- **Enhanced recurring tasks with frequency** (v2.3.0)
 - Audit logging
 - Email system (Mailgun)
 - Notifications
@@ -657,7 +708,7 @@ X-XSS-Protection: 1; mode=block
 - Responsive design
 
 ### 🚧 In Development
-- None (v2.2.0 complete)
+- None (v2.3.0 complete)
 
 ### 📋 Planned Features
 - Two-factor authentication (2FA)
@@ -671,3 +722,4 @@ X-XSS-Protection: 1; mode=block
 - API rate limiting
 - Activity feed
 - Task priority levels (high/medium/low)
+- Push notifications
