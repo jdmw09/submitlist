@@ -32,7 +32,7 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilt
 export const upload = multer({
   storage: storage,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE || '524288000'), // 500MB default for large phone videos
+    fileSize: parseInt(process.env.MAX_FILE_SIZE || '209715200'), // 200MB default (free accounts have 250MB storage)
   },
   fileFilter: fileFilter,
 });
