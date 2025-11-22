@@ -60,32 +60,44 @@ const TaskCompletionsPage: React.FC = () => {
     return (
       <div className="completion-files-grid">
         {completion.completion_type === 'image' && filePaths.map((path, idx) => (
-          <img
-            key={idx}
-            src={path}
-            alt={`Completion ${idx + 1}`}
-            className="completion-image-large"
-          />
+          <div key={idx} className="file-item">
+            <img
+              src={path}
+              alt={`Completion ${idx + 1}`}
+              className="completion-image-large"
+            />
+            <a href={path} download className="download-link">
+              ⬇ Download
+            </a>
+          </div>
         ))}
         {completion.completion_type === 'video' && filePaths.map((path, idx) => (
-          <video
-            key={idx}
-            src={path}
-            className="completion-video-large"
-            controls
-          />
+          <div key={idx} className="file-item">
+            <video
+              src={path}
+              className="completion-video-large"
+              controls
+            />
+            <a href={path} download className="download-link">
+              ⬇ Download
+            </a>
+          </div>
         ))}
         {completion.completion_type === 'document' && filePaths.map((path, idx) => (
-          <a
-            key={idx}
-            href={path}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="completion-document-card"
-          >
-            <div className="document-icon">📄</div>
-            <div className="document-name">{path.split('/').pop()}</div>
-          </a>
+          <div key={idx} className="file-item">
+            <a
+              href={path}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="completion-document-card"
+            >
+              <div className="document-icon">📄</div>
+              <div className="document-name">{path.split('/').pop()}</div>
+            </a>
+            <a href={path} download className="download-link">
+              ⬇ Download
+            </a>
+          </div>
         ))}
       </div>
     );

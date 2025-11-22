@@ -130,6 +130,32 @@
   gap: 12px;
 }
 
+.file-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.download-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #007AFF;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+  align-self: flex-start;
+}
+
+.download-link:hover {
+  background: #0056b3;
+}
+
 .completion-image-large {
   max-width: 100%;
   border-radius: 8px;

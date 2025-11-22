@@ -395,31 +395,37 @@ const TaskDetailPage: React.FC = () => {
                               {filePaths.length > 0 && (
                                 <div className="completion-files">
                                   {completion.completion_type === 'image' && filePaths.map((path, idx) => (
-                                    <img
-                                      key={idx}
-                                      src={path}
-                                      alt={`Completion ${idx + 1}`}
-                                      className="completion-image-small"
-                                    />
+                                    <div key={idx} className="file-item-inline">
+                                      <img
+                                        src={path}
+                                        alt={`Completion ${idx + 1}`}
+                                        className="completion-image-small"
+                                      />
+                                      <a href={path} download className="download-link-small">⬇ Download</a>
+                                    </div>
                                   ))}
                                   {completion.completion_type === 'video' && filePaths.map((path, idx) => (
-                                    <video
-                                      key={idx}
-                                      src={path}
-                                      className="completion-video-small"
-                                      controls
-                                    />
+                                    <div key={idx} className="file-item-inline">
+                                      <video
+                                        src={path}
+                                        className="completion-video-small"
+                                        controls
+                                      />
+                                      <a href={path} download className="download-link-small">⬇ Download</a>
+                                    </div>
                                   ))}
                                   {completion.completion_type === 'document' && filePaths.map((path, idx) => (
-                                    <a
-                                      key={idx}
-                                      href={path}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="completion-document-link"
-                                    >
-                                      📄 {path.split('/').pop()}
-                                    </a>
+                                    <div key={idx} className="file-item-inline">
+                                      <a
+                                        href={path}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="completion-document-link"
+                                      >
+                                        📄 {path.split('/').pop()}
+                                      </a>
+                                      <a href={path} download className="download-link-small">⬇ Download</a>
+                                    </div>
                                   ))}
                                 </div>
                               )}

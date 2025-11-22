@@ -287,6 +287,32 @@
   background: #45a049;
 }
 
+.file-item-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.download-link-small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: #007AFF;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.2s;
+  align-self: flex-start;
+}
+
+.download-link-small:hover {
+  background: #0056b3;
+}
+
 @media (max-width: 768px) {
   .task-header {
     flex-direction: column;
