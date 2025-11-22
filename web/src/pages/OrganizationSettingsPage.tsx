@@ -29,6 +29,7 @@ interface TaskSettings {
   auto_archive_enabled: boolean;
   auto_archive_after_days: number;
   archive_schedule: 'daily' | 'weekly_sunday' | 'weekly_monday';
+  archive_mode: 'by_days' | 'by_schedule'; // Either archive after X days OR on a specific day
 }
 
 const OrganizationSettingsPage: React.FC = () => {
@@ -46,7 +47,8 @@ const OrganizationSettingsPage: React.FC = () => {
     hide_completed_tasks: false,
     auto_archive_enabled: false,
     auto_archive_after_days: 7,
-    archive_schedule: 'daily',
+    archive_schedule: 'weekly_sunday',
+    archive_mode: 'by_days',
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -94,12 +96,19 @@ const OrganizationSettingsPage: React.FC = () => {
       const response = await organizationAPI.getSettings(org.id);
       const settings = response.data.settings;
       if (settings) {
+        // Determine archive_mode based on schedule - if it's weekly, use by_schedule mode
+        const archiveSchedule = settings.archive_schedule || 'daily';
+        const archiveMode = (archiveSchedule === 'weekly_sunday' || archiveSchedule === 'weekly_monday')
+          ? 'by_schedule'
+          : 'by_days';
+
         setTaskSettings({
           default_task_sort: settings.default_task_sort || 'due_date',
           hide_completed_tasks: settings.hide_completed_tasks || false,
           auto_archive_enabled: settings.auto_archive_enabled || false,
           auto_archive_after_days: settings.auto_archive_after_days || 7,
-          archive_schedule: settings.archive_schedule || 'daily',
+          archive_schedule: archiveSchedule,
+          archive_mode: archiveMode,
         });
       }
     } catch (error) {
@@ -114,12 +123,18 @@ const OrganizationSettingsPage: React.FC = () => {
 
     setSavingSettings(true);
     try {
+      // When saving, set the schedule based on mode
+      // by_days mode uses 'daily' schedule, by_schedule uses the selected weekly schedule
+      const archiveSchedule = taskSettings.archive_mode === 'by_days'
+        ? 'daily'
+        : taskSettings.archive_schedule;
+
       await organizationAPI.updateSettings(org.id, {
         defaultTaskSort: taskSettings.default_task_sort,
         hideCompletedTasks: taskSettings.hide_completed_tasks,
         autoArchiveEnabled: taskSettings.auto_archive_enabled,
         autoArchiveAfterDays: taskSettings.auto_archive_after_days,
-        archiveSchedule: taskSettings.archive_schedule,
+        archiveSchedule: archiveSchedule,
       });
       alert('Task settings updated successfully');
     } catch (error: any) {
@@ -320,37 +335,62 @@ const OrganizationSettingsPage: React.FC = () => {
               </div>
 
               {taskSettings.auto_archive_enabled && (
-                <>
-                  <div className="setting-row indented">
-                    <label htmlFor="archive-days">Archive After</label>
-                    <select
-                      id="archive-days"
-                      value={taskSettings.auto_archive_after_days}
-                      onChange={(e) => setTaskSettings({ ...taskSettings, auto_archive_after_days: parseInt(e.target.value) })}
-                      className="setting-select"
-                    >
-                      <option value={1}>1 day</option>
-                      <option value={3}>3 days</option>
-                      <option value={7}>7 days</option>
-                      <option value={14}>14 days</option>
-                      <option value={30}>30 days</option>
-                    </select>
+                <div className="archive-options">
+                  <div className="archive-option">
+                    <label className="radio-label">
+                      <input
+                        type="radio"
+                        name="archive-mode"
+                        checked={taskSettings.archive_mode === 'by_days'}
+                        onChange={() => setTaskSettings({ ...taskSettings, archive_mode: 'by_days' })}
+                      />
+                      <span>Archive after a number of days</span>
+                    </label>
+                    {taskSettings.archive_mode === 'by_days' && (
+                      <div className="archive-option-detail">
+                        <label htmlFor="archive-days">Archive completed tasks after</label>
+                        <select
+                          id="archive-days"
+                          value={taskSettings.auto_archive_after_days}
+                          onChange={(e) => setTaskSettings({ ...taskSettings, auto_archive_after_days: parseInt(e.target.value) })}
+                          className="setting-select"
+                        >
+                          <option value={1}>1 day</option>
+                          <option value={3}>3 days</option>
+                          <option value={7}>7 days</option>
+                          <option value={14}>14 days</option>
+                          <option value={30}>30 days</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="setting-row indented">
-                    <label htmlFor="archive-schedule">Archive Schedule</label>
-                    <select
-                      id="archive-schedule"
-                      value={taskSettings.archive_schedule}
-                      onChange={(e) => setTaskSettings({ ...taskSettings, archive_schedule: e.target.value as 'daily' | 'weekly_sunday' | 'weekly_monday' })}
-                      className="setting-select"
-                    >
-                      <option value="daily">Daily</option>
-                      <option value="weekly_sunday">Weekly (Sunday)</option>
-                      <option value="weekly_monday">Weekly (Monday)</option>
-                    </select>
+                  <div className="archive-option">
+                    <label className="radio-label">
+                      <input
+                        type="radio"
+                        name="archive-mode"
+                        checked={taskSettings.archive_mode === 'by_schedule'}
+                        onChange={() => setTaskSettings({ ...taskSettings, archive_mode: 'by_schedule' })}
+                      />
+                      <span>Archive on a specific day of the week</span>
+                    </label>
+                    {taskSettings.archive_mode === 'by_schedule' && (
+                      <div className="archive-option-detail">
+                        <label htmlFor="archive-schedule">Archive all completed tasks every</label>
+                        <select
+                          id="archive-schedule"
+                          value={taskSettings.archive_schedule}
+                          onChange={(e) => setTaskSettings({ ...taskSettings, archive_schedule: e.target.value as 'weekly_sunday' | 'weekly_monday' })}
+                          className="setting-select"
+                        >
+                          <option value="weekly_sunday">Sunday</option>
+                          <option value="weekly_monday">Monday</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
-                </>
+                </div>
               )}
 
               <button

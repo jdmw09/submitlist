@@ -23,8 +23,13 @@ const TasksPage: React.FC = () => {
 
   useEffect(() => {
     if (selectedOrg) {
-      loadTasks();
       loadOrgSettings();
+    }
+  }, [selectedOrg]);
+
+  useEffect(() => {
+    if (selectedOrg) {
+      loadTasks();
     }
   }, [selectedOrg, filter, sortOrder, hideCompleted]);
 
