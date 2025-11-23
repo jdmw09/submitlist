@@ -60,26 +60,6 @@ CREATE TABLE IF NOT EXISTS organization_join_requests (
   UNIQUE(organization_id, user_id)
 );
 
--- Task groups table (Phase 1: Group Management)
-CREATE TABLE IF NOT EXISTS task_groups (
-  id SERIAL PRIMARY KEY,
-  organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-  created_by_id INTEGER REFERENCES users(id),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Task group members table (Phase 1: Group Management)
-CREATE TABLE IF NOT EXISTS task_group_members (
-  id SERIAL PRIMARY KEY,
-  group_id INTEGER NOT NULL REFERENCES task_groups(id) ON DELETE CASCADE,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(group_id, user_id)
-);
-
 -- Organization settings table
 CREATE TABLE IF NOT EXISTS organization_settings (
   id SERIAL PRIMARY KEY,
@@ -107,10 +87,9 @@ CREATE TABLE IF NOT EXISTS tasks (
   end_date TIMESTAMP,
   schedule_type VARCHAR(50) NOT NULL DEFAULT 'one_time', -- 'one_time', 'daily', 'weekly', 'monthly'
   schedule_frequency INTEGER DEFAULT 1, -- e.g., every 2 days, every 3 weeks
-  status VARCHAR(50) NOT NULL DEFAULT 'pending', -- 'pending', 'in_progress', 'submitted', 'completed', 'overdue'
+  status VARCHAR(50) NOT NULL DEFAULT 'in_progress', -- 'in_progress', 'submitted', 'completed', 'overdue'
   parent_template_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL, -- For scheduled task instances
   is_private BOOLEAN DEFAULT false,
-  group_id INTEGER REFERENCES task_groups(id) ON DELETE SET NULL,
   archived_at TIMESTAMP DEFAULT NULL, -- When task was archived
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -188,10 +167,7 @@ CREATE INDEX IF NOT EXISTS idx_join_requests_org ON organization_join_requests(o
 CREATE INDEX IF NOT EXISTS idx_join_requests_user ON organization_join_requests(user_id);
 CREATE INDEX IF NOT EXISTS idx_join_requests_status ON organization_join_requests(status);
 
--- Phase 1: Group and multi-assignee indexes
-CREATE INDEX IF NOT EXISTS idx_task_groups_org ON task_groups(organization_id);
-CREATE INDEX IF NOT EXISTS idx_task_group_members_group ON task_group_members(group_id);
-CREATE INDEX IF NOT EXISTS idx_task_group_members_user ON task_group_members(user_id);
+-- Phase 1: Multi-assignee indexes
 CREATE INDEX IF NOT EXISTS idx_task_assignees_task ON task_assignees(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_assignees_user ON task_assignees(user_id);
 CREATE INDEX IF NOT EXISTS idx_task_assignees_status ON task_assignees(status);
@@ -202,7 +178,6 @@ CREATE INDEX IF NOT EXISTS idx_tasks_assigned_user_id ON tasks(assigned_user_id)
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_schedule_type ON tasks(schedule_type);
 CREATE INDEX IF NOT EXISTS idx_tasks_creator ON tasks(created_by_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_group ON tasks(group_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_private ON tasks(is_private);
 CREATE INDEX IF NOT EXISTS idx_task_requirements_task_id ON task_requirements(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_completions_task_id ON task_completions(task_id);

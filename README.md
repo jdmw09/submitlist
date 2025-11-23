@@ -6,6 +6,7 @@ A full-stack task management system with scheduled tasks, team collaboration, an
 
 ### Core Functionality
 - User authentication (email/password with JWT)
+- **Email verification** and **password reset** flows with Mailgun integration
 - Organization/team management with role-based access (admin/member)
 - Task creation with customizable requirements (checklist items)
 - One-time and scheduled tasks (daily, weekly, monthly)
@@ -22,6 +23,15 @@ A full-stack task management system with scheduled tasks, team collaboration, an
 - Comprehensive audit logging
 - **WCAG 2.1 Level AA accessibility** (93% compliant)
 - Dark mode support (web and mobile)
+
+### Admin Features (v2.4.0)
+- **Admin Dashboard** - Centralized user management at `/admin`
+- **Create Users** - Admin can create pre-verified users with assigned passwords
+- **Organization Assignment** - Assign users to organizations during creation
+- **User Management** - View, search, filter users by role/status
+- **Account Control** - Suspend, activate, or delete user accounts
+- **Force Password Reset** - Send password reset emails to users
+- **Audit Logs** - Track all admin actions for compliance
 
 ### Subscription Billing (NEW - v2.1.0)
 - Three-tier subscription model:
@@ -230,6 +240,25 @@ After seeding the database, you can login with:
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login user
 - `GET /api/auth/profile` - Get user profile (requires auth)
+- `POST /api/auth/forgot-password` - Request password reset email
+- `POST /api/auth/reset-password` - Reset password with token
+- `GET /api/auth/verify-email/:token` - Verify email address
+- `POST /api/auth/resend-verification` - Resend verification email
+
+### Admin (requires admin/super_admin role)
+- `POST /api/admin/users` - Create new user (pre-verified, with optional org assignment)
+- `GET /api/admin/users` - List all users (with search, filter, pagination)
+- `GET /api/admin/users/:id` - Get user details
+- `PUT /api/admin/users/:id/role` - Update user role
+- `PUT /api/admin/users/:id/status` - Suspend/activate user
+- `DELETE /api/admin/users/:id` - Soft delete user
+- `POST /api/admin/users/:id/force-password-reset` - Send password reset email
+- `GET /api/admin/organizations` - List all organizations
+- `GET /api/admin/users/:id/organizations` - Get user's organizations
+- `POST /api/admin/users/:id/organizations` - Add user to organization
+- `DELETE /api/admin/users/:id/organizations/:orgId` - Remove user from organization
+- `PUT /api/admin/users/:id/organizations/:orgId/role` - Update user's org role
+- `GET /api/admin/audit-logs` - View admin audit logs
 
 ### Organizations
 - `POST /api/organizations` - Create organization

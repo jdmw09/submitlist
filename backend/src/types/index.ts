@@ -38,7 +38,7 @@ export interface Task {
   end_date?: Date;
   schedule_type: 'one_time' | 'daily' | 'weekly' | 'monthly';
   schedule_frequency: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'overdue';
+  status: 'in_progress' | 'submitted' | 'completed' | 'overdue';
   parent_template_id?: number;
   created_at: Date;
   updated_at: Date;

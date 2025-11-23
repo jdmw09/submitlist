@@ -275,6 +275,56 @@
   background: var(--bg-secondary);
 }
 
+[data-theme='dark'] .modal {
+  background: var(--color-bg-primary, #1a1a2e);
+}
+
+[data-theme='dark'] .modal-header {
+  border-bottom-color: var(--color-border-default, #333);
+}
+
+[data-theme='dark'] .modal-header h2 {
+  color: var(--color-text-primary, #fff);
+}
+
+[data-theme='dark'] .modal-footer {
+  border-top-color: var(--color-border-default, #333);
+}
+
+[data-theme='dark'] .form-group label {
+  color: var(--color-text-primary, #fff);
+}
+
+[data-theme='dark'] .form-control {
+  background: var(--color-bg-secondary, #252540);
+  border-color: var(--color-border-default, #444);
+  color: var(--color-text-primary, #fff);
+}
+
+[data-theme='dark'] .form-control option {
+  background: var(--color-bg-secondary, #252540);
+  color: var(--color-text-primary, #fff);
+}
+
+/* Light mode explicit styles */
+.modal {
+  background: #ffffff;
+}
+
+.modal-header h2 {
+  color: #1a1a2e;
+}
+
+.form-group label {
+  color: #1a1a2e;
+}
+
+.form-control {
+  background: #ffffff;
+  border-color: #e0e0e0;
+  color: #1a1a2e;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .org-card {

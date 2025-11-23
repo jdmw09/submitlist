@@ -26,6 +26,12 @@
   flex: 1;
 }
 
+.task-header .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .task-header .status-badge {
   padding: 8px 16px;
   border-radius: 20px;
@@ -33,6 +39,50 @@
   font-size: 14px;
   font-weight: 600;
   text-transform: capitalize;
+}
+
+/* Edit Form Styles */
+.edit-form {
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+}
+
+.edit-form .input-group {
+  margin-bottom: 16px;
+}
+
+.edit-form .input-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #333;
+}
+
+.edit-form .input-group input,
+.edit-form .input-group textarea,
+.edit-form .input-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.edit-form .input-group input:focus,
+.edit-form .input-group textarea:focus,
+.edit-form .input-group select:focus {
+  outline: none;
+  border-color: #2196F3;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
 }
 
 .info-grid {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { taskAPI, commentAPI } from '../services/api';
-import { Task, TaskRequirement, TaskComment } from '../types';
+import { taskAPI, commentAPI, organizationAPI } from '../services/api';
+import { Task, TaskComment } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import './TaskDetailPage.css';
@@ -22,6 +22,15 @@ const TaskDetailPage: React.FC = () => {
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingCommentText, setEditingCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDetails, setEditDetails] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [editAssignedUserId, setEditAssignedUserId] = useState<number | undefined>();
+  const [orgMembers, setOrgMembers] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -113,6 +122,57 @@ const TaskDetailPage: React.FC = () => {
       navigate('/');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const canEdit = user && (task?.created_by_id === user.id || userOrgRole === 'admin');
+
+  const startEditing = async () => {
+    if (!task) return;
+    setEditTitle(task.title);
+    setEditDetails(task.details || '');
+    setEditEndDate(task.end_date ? task.end_date.split('T')[0] : '');
+    setEditAssignedUserId(task.assigned_user_id);
+
+    // Load org members for assignee dropdown
+    try {
+      const response = await organizationAPI.getMembers(task.organization_id);
+      setOrgMembers(response.data.members || []);
+    } catch (error) {
+      console.error('Failed to load org members:', error);
+    }
+
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditTitle('');
+    setEditDetails('');
+    setEditEndDate('');
+    setEditAssignedUserId(undefined);
+  };
+
+  const saveEdits = async () => {
+    if (!task || !editTitle.trim()) {
+      alert('Title is required');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await taskAPI.update(Number(id), {
+        title: editTitle.trim(),
+        details: editDetails.trim() || null,
+        endDate: editEndDate || null,
+        assignedUserId: editAssignedUserId || null,
+      });
+      setIsEditing(false);
+      loadTask();
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to save changes');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -295,44 +355,112 @@ const TaskDetailPage: React.FC = () => {
 
         <div className="task-header">
           <h1>{task.title}</h1>
-          <span
-            className="status-badge"
-            style={{ backgroundColor: getStatusColor(task.status) }}
-          >
-            {task.status.replace('_', ' ')}
-          </span>
+          <div className="header-actions">
+            <span
+              className="status-badge"
+              style={{ backgroundColor: getStatusColor(task.status) }}
+            >
+              {task.status.replace('_', ' ')}
+            </span>
+            {canEdit && !isEditing && (
+              <button className="btn btn-secondary btn-sm" onClick={startEditing}>
+                Edit Task
+              </button>
+            )}
+          </div>
         </div>
 
-        {task.details && (
+        {/* Edit Form */}
+        {isEditing && (
+          <div className="card edit-form">
+            <h3>Edit Task</h3>
+            <div className="input-group">
+              <label htmlFor="edit-title">Title *</label>
+              <input
+                id="edit-title"
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Task title"
+              />
+            </div>
+            <div className="input-group">
+              <label htmlFor="edit-details">Details</label>
+              <textarea
+                id="edit-details"
+                value={editDetails}
+                onChange={(e) => setEditDetails(e.target.value)}
+                placeholder="Task details"
+                rows={4}
+              />
+            </div>
+            <div className="input-group">
+              <label htmlFor="edit-due-date">Due Date</label>
+              <input
+                id="edit-due-date"
+                type="date"
+                value={editEndDate}
+                onChange={(e) => setEditEndDate(e.target.value)}
+              />
+            </div>
+            <div className="input-group">
+              <label htmlFor="edit-assignee">Assigned To</label>
+              <select
+                id="edit-assignee"
+                value={editAssignedUserId || ''}
+                onChange={(e) => setEditAssignedUserId(e.target.value ? Number(e.target.value) : undefined)}
+              >
+                <option value="">Unassigned</option>
+                {orgMembers.map((member) => (
+                  <option key={member.user_id} value={member.user_id}>
+                    {member.name} ({member.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="edit-actions">
+              <button className="btn btn-secondary" onClick={cancelEditing} disabled={saving}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={saveEdits} disabled={saving}>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isEditing && task.details && (
           <div className="card">
             <h3>Details</h3>
             <p>{task.details}</p>
           </div>
         )}
 
-        <div className="card">
-          <h3>Information</h3>
-          <div className="info-grid">
-            {task.assigned_user_name && (
+        {!isEditing && (
+          <div className="card">
+            <h3>Information</h3>
+            <div className="info-grid">
+              {task.assigned_user_name && (
+                <div>
+                  <strong>Assigned to:</strong> {task.assigned_user_name}
+                </div>
+              )}
+              {task.created_by_name && (
+                <div>
+                  <strong>Created by:</strong> {task.created_by_name}
+                </div>
+              )}
+              {task.end_date && (
+                <div>
+                  <strong>Due date:</strong> {new Date(task.end_date).toLocaleDateString()}
+                </div>
+              )}
               <div>
-                <strong>Assigned to:</strong> {task.assigned_user_name}
+                <strong>Schedule:</strong> {task.schedule_type.replace('_', ' ')}
               </div>
-            )}
-            {task.created_by_name && (
-              <div>
-                <strong>Created by:</strong> {task.created_by_name}
-              </div>
-            )}
-            {task.end_date && (
-              <div>
-                <strong>Due date:</strong> {new Date(task.end_date).toLocaleDateString()}
-              </div>
-            )}
-            <div>
-              <strong>Schedule:</strong> {task.schedule_type.replace('_', ' ')}
             </div>
           </div>
-        </div>
+        )}
 
         {task.requirements && task.requirements.length > 0 && (
           <div className="card">

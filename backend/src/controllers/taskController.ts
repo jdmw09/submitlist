@@ -13,7 +13,6 @@ export const createTask = async (req: AuthRequest, res: Response) => {
       details,
       assignedUserId,
       assignedUserIds,
-      groupId,
       isPrivate,
       startDate,
       endDate,
@@ -47,16 +46,6 @@ export const createTask = async (req: AuthRequest, res: Response) => {
       assigneeIds = [assignedUserId];
     }
 
-    // If groupId provided, get all group members
-    if (groupId) {
-      const groupMembersResult = await query(
-        'SELECT user_id FROM task_group_members WHERE group_id = $1',
-        [groupId]
-      );
-      const groupMemberIds = groupMembersResult.rows.map((r: any) => r.user_id);
-      assigneeIds = [...new Set([...assigneeIds, ...groupMemberIds])]; // Merge and dedupe
-    }
-
     // Verify all assignees are members of the organization
     for (const assigneeId of assigneeIds) {
       const assigneeCheck = await query(
@@ -71,8 +60,8 @@ export const createTask = async (req: AuthRequest, res: Response) => {
 
     // Create task (remove assigned_user_id from insert, use task_assignees table instead)
     const taskResult = await query(
-      `INSERT INTO tasks (organization_id, title, details, created_by_id, start_date, end_date, schedule_type, schedule_frequency, status, group_id, is_private)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO tasks (organization_id, title, details, created_by_id, start_date, end_date, schedule_type, schedule_frequency, status, is_private)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         organizationId,
@@ -83,8 +72,7 @@ export const createTask = async (req: AuthRequest, res: Response) => {
         endDate,
         scheduleType,
         scheduleFrequency,
-        'pending',
-        groupId || null,
+        'in_progress',
         isPrivate || false,
       ]
     );
@@ -325,7 +313,7 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
 
     const task = existingTask.rows[0];
 
-    // Check if user is a member
+    // Check if user is a member and get their role
     const memberCheck = await query(
       'SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2',
       [task.organization_id, userId]
@@ -333,6 +321,14 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
 
     if (memberCheck.rows.length === 0) {
       return res.status(403).json({ error: 'You do not have access to this task' });
+    }
+
+    // Only task creator or org admin can edit tasks
+    const isTaskCreator = task.created_by_id === userId;
+    const isOrgAdmin = memberCheck.rows[0].role === 'admin';
+
+    if (!isTaskCreator && !isOrgAdmin) {
+      return res.status(403).json({ error: 'Only the task creator or organization admin can edit this task' });
     }
 
     // Build update query
@@ -741,7 +737,7 @@ export const reviewTask = async (req: AuthRequest, res: Response) => {
     );
 
     // Update task status based on action
-    const newStatus = action === 'approved' ? 'completed' : 'pending';
+    const newStatus = action === 'approved' ? 'completed' : 'in_progress';
     await query(
       'UPDATE tasks SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [newStatus, taskId]
@@ -1106,7 +1102,7 @@ export const completeTaskByAssignee = async (req: AuthRequest, res: Response) =>
 export const copyTask = async (req: AuthRequest, res: Response) => {
   try {
     const { taskId } = req.params;
-    const { title, endDate, assignedUserIds, groupId } = req.body;
+    const { title, endDate, assignedUserIds } = req.body;
     const userId = req.user!.id;
 
     // Get original task
@@ -1131,8 +1127,8 @@ export const copyTask = async (req: AuthRequest, res: Response) => {
     const newTaskResult = await query(
       `INSERT INTO tasks (
         organization_id, title, details, created_by_id, start_date, end_date,
-        schedule_type, schedule_frequency, status, group_id, is_private
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        schedule_type, schedule_frequency, status, is_private
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *`,
       [
         originalTask.organization_id,
@@ -1143,8 +1139,7 @@ export const copyTask = async (req: AuthRequest, res: Response) => {
         endDate || null, // Use provided end date or null
         originalTask.schedule_type,
         originalTask.schedule_frequency,
-        'pending', // Always start as pending
-        groupId !== undefined ? groupId : originalTask.group_id,
+        'in_progress', // Always start as in_progress
         originalTask.is_private
       ]
     );
@@ -1168,13 +1163,6 @@ export const copyTask = async (req: AuthRequest, res: Response) => {
     let assigneeIds: number[] = [];
     if (assignedUserIds && Array.isArray(assignedUserIds)) {
       assigneeIds = assignedUserIds;
-    } else if (groupId) {
-      // Get group members
-      const groupMembersResult = await query(
-        'SELECT user_id FROM task_group_members WHERE group_id = $1',
-        [groupId]
-      );
-      assigneeIds = groupMembersResult.rows.map((r: any) => r.user_id);
     }
 
     for (const assigneeId of assigneeIds) {

@@ -17,14 +17,6 @@ import {
   reviewJoinRequest,
   // Phase 0: Public Organizations
   getPublicOrganizations,
-  // Phase 1: Task Groups
-  createTaskGroup,
-  getTaskGroups,
-  getTaskGroupDetails,
-  updateTaskGroup,
-  deleteTaskGroup,
-  addGroupMembers,
-  removeGroupMember,
   // Organization Settings
   getOrganizationSettings,
   updateOrganizationSettings,
@@ -59,15 +51,6 @@ router.post('/invites/:inviteCode/accept', acceptInvite);
 router.post('/:organizationId/join-requests', createJoinRequest);
 router.get('/:organizationId/join-requests', getJoinRequests);
 router.put('/join-requests/:requestId', reviewJoinRequest);
-
-// Phase 1: Task group management
-router.post('/:organizationId/groups', createTaskGroup);
-router.get('/:organizationId/groups', getTaskGroups);
-router.get('/:organizationId/groups/:groupId', getTaskGroupDetails);
-router.put('/:organizationId/groups/:groupId', updateTaskGroup);
-router.delete('/:organizationId/groups/:groupId', deleteTaskGroup);
-router.post('/:organizationId/groups/:groupId/members', addGroupMembers);
-router.delete('/:organizationId/groups/:groupId/members/:userId', removeGroupMember);
 
 // Organization settings
 router.get('/:organizationId/settings', getOrganizationSettings);

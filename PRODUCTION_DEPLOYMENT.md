@@ -1,6 +1,6 @@
 # Production Deployment Guide - submitlist.space
 
-Complete documentation of the DigitalOcean production deployment completed on November 20, 2025.
+Complete documentation of the DigitalOcean production deployment. Initial deployment completed November 20, 2025. Last updated November 22, 2025 (v2.4.0 - Admin Dashboard).
 
 ## Deployment Overview
 
@@ -115,6 +115,31 @@ ssh -i ~/.ssh/taskmanager_rsa root@165.22.46.130 \
 - Expires: February 18, 2026
 - Auto-renewal: Enabled via certbot systemd timer
 - Location: `/etc/letsencrypt/live/submitlist.space/`
+
+## Features Deployed
+
+### Admin Dashboard (v2.4.0 - November 22, 2025)
+- **Admin User Creation** - Create users with pre-verified status and assigned passwords
+- **Organization Assignment** - Assign users to organizations during creation
+- **User Management** - View, search, filter users by role/status
+- **Account Control** - Suspend, activate, or delete user accounts
+- **Force Password Reset** - Send password reset emails to users
+- **Audit Logs** - Track all admin actions for compliance
+- **Dark Mode Support** - Full dark/light mode theming
+
+### Email Integration (Mailgun)
+- **Email Verification** - Users can verify email addresses
+- **Password Reset** - Forgot password flow with email tokens
+- **Welcome Emails** - Admin-created users receive welcome emails with credentials
+
+**Email Service Configuration:**
+```env
+MAILGUN_API_KEY=<api-key>
+MAILGUN_DOMAIN=submitlist.space
+MAILGUN_FROM=TaskManager <noreply@submitlist.space>
+```
+
+---
 
 ## Critical Fixes Applied
 

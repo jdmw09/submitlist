@@ -443,6 +443,89 @@ Thank you for joining TaskManager. We're excited to have you on board!
 };
 
 /**
+ * Send welcome email for admin-created users
+ */
+export const sendWelcomeEmail = async (
+  email: string,
+  name: string,
+  tempPassword: string
+): Promise<void> => {
+  const loginUrl = `${APP_URL}/login`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to TaskManager</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">TaskManager</h1>
+        </div>
+
+        <div style="background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
+          <h2 style="color: #333; margin-top: 0;">Welcome to TaskManager, ${name}!</h2>
+
+          <p style="font-size: 16px; color: #555;">
+            An account has been created for you. Here are your login credentials:
+          </p>
+
+          <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 25px 0;">
+            <p style="margin: 0 0 10px 0; font-size: 14px;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 0; font-size: 14px;"><strong>Temporary Password:</strong> <code style="background: #e0e0e0; padding: 2px 8px; border-radius: 4px;">${tempPassword}</code></p>
+          </div>
+
+          <p style="font-size: 14px; color: #f44336; background: #ffebee; padding: 15px; border-left: 4px solid #f44336; border-radius: 4px;">
+            <strong>Important:</strong> We recommend changing your password after your first login for security purposes.
+          </p>
+
+          <div style="text-align: center; margin: 35px 0;">
+            <a href="${loginUrl}"
+               style="background: #2196F3; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">
+              Log In Now
+            </a>
+          </div>
+
+          <p style="font-size: 13px; color: #999; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+            If you have any questions, please contact your administrator.
+          </p>
+        </div>
+
+        <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
+          <p>© ${new Date().getFullYear()} TaskManager. All rights reserved.</p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+Welcome to TaskManager, ${name}!
+
+An account has been created for you. Here are your login credentials:
+
+Email: ${email}
+Temporary Password: ${tempPassword}
+
+IMPORTANT: We recommend changing your password after your first login for security purposes.
+
+Log in at: ${loginUrl}
+
+If you have any questions, please contact your administrator.
+
+© ${new Date().getFullYear()} TaskManager. All rights reserved.
+  `.trim();
+
+  await sendEmail({
+    to: email,
+    subject: 'Welcome to TaskManager - Your Account Details',
+    html,
+    text,
+  });
+};
+
+/**
  * Strip HTML tags from a string (basic implementation)
  */
 function stripHtml(html: string): string {

@@ -127,9 +127,9 @@ async function createTaskInstance(template: any, date: Date) {
       `INSERT INTO tasks (
         organization_id, title, details, created_by_id,
         start_date, end_date, schedule_type, schedule_frequency,
-        status, parent_template_id, is_private, group_id
+        status, parent_template_id, is_private
       )
-      VALUES ($1, $2, $3, $4, $5, $6, 'one_time', 1, 'pending', $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, 'one_time', 1, 'in_progress', $7, $8)
       RETURNING id`,
       [
         template.organization_id,
@@ -140,7 +140,6 @@ async function createTaskInstance(template: any, date: Date) {
         endDate,
         template.id,
         template.is_private,
-        template.group_id,
       ]
     );
 

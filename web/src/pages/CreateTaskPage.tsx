@@ -14,15 +14,12 @@ const CreateTaskPage: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [assignedUserIds, setAssignedUserIds] = useState<number[]>([]);
-  const [groupId, setGroupId] = useState<number | undefined>();
   const [isPrivate, setIsPrivate] = useState(false);
   const [orgMembers, setOrgMembers] = useState<any[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadOrgMembers();
-    loadGroups();
   }, []);
 
   const loadOrgMembers = async () => {
@@ -44,19 +41,6 @@ const CreateTaskPage: React.FC = () => {
     } else {
       console.warn('No organization selected in localStorage');
       alert('Please select an organization first from the Organizations page');
-    }
-  };
-
-  const loadGroups = async () => {
-    const storedOrg = localStorage.getItem('selectedOrganization');
-    if (storedOrg) {
-      const org = JSON.parse(storedOrg);
-      try {
-        const response = await organizationAPI.getGroups(org.id);
-        setGroups(response.data.groups || []);
-      } catch (error: any) {
-        console.error('Failed to load groups:', error);
-      }
     }
   };
 
@@ -104,7 +88,6 @@ const CreateTaskPage: React.FC = () => {
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         assignedUserIds: assignedUserIds.length > 0 ? assignedUserIds : undefined,
-        groupId: groupId || undefined,
         isPrivate,
       });
 
@@ -181,22 +164,6 @@ const CreateTaskPage: React.FC = () => {
               </div>
             </div>
           )}
-
-          <div className="input-group">
-            <label>Assign To Group (optional)</label>
-            <select
-              value={groupId || ''}
-              onChange={(e) => setGroupId(e.target.value ? Number(e.target.value) : undefined)}
-            >
-              <option value="">No group</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name} ({group.member_count} members)
-                </option>
-              ))}
-            </select>
-            <small>Selecting a group will automatically assign all group members</small>
-          </div>
 
           <div className="input-group">
             <label>Assign To Members (optional)</label>

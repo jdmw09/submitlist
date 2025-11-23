@@ -65,7 +65,7 @@ async function seed() {
         new Date(),
         new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
         'one_time',
-        'pending'
+        'in_progress'
       ]
     );
     const taskId = taskResult.rows[0].id;

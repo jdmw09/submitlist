@@ -2,7 +2,135 @@ import { Request, Response } from 'express';
 import { query } from '../config/database';
 import { AuthRequest } from '../middleware/auth';
 import crypto from 'crypto';
-import { sendAdminPasswordResetEmail } from '../services/emailService';
+import bcrypt from 'bcrypt';
+import { sendAdminPasswordResetEmail, sendWelcomeEmail } from '../services/emailService';
+
+/**
+ * Create a new user (admin-initiated)
+ * POST /api/admin/users
+ */
+export const createUser = async (req: AuthRequest, res: Response) => {
+  try {
+    const { email, name, username, password, role = 'member', organizationId, organizationRole = 'member' } = req.body;
+    const adminId = req.user!.id;
+    const adminRole = req.user!.role;
+
+    // Validate required fields
+    if (!email || !name || !password) {
+      return res.status(400).json({ error: 'Email, name, and password are required' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    // Validate role
+    if (!['member', 'admin', 'super_admin'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    // Only super_admin can create super_admin users
+    if (role === 'super_admin' && adminRole !== 'super_admin') {
+      return res.status(403).json({ error: 'Only super admins can create super admin users' });
+    }
+
+    // Check if email already exists
+    const existingEmail = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+    if (existingEmail.rows.length > 0) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+
+    // Check if username already exists (if provided)
+    if (username) {
+      const existingUsername = await query('SELECT id FROM users WHERE username = $1', [username.toLowerCase()]);
+      if (existingUsername.rows.length > 0) {
+        return res.status(400).json({ error: 'Username already exists' });
+      }
+    }
+
+    // Hash password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    // Create user - marked as verified since admin created
+    const userResult = await query(
+      `INSERT INTO users (email, username, name, password_hash, role, email_verified, email_verified_at, account_status)
+       VALUES ($1, $2, $3, $4, $5, true, NOW(), 'active')
+       RETURNING id, email, username, name, role, email_verified, account_status, created_at`,
+      [email.toLowerCase(), username?.toLowerCase() || null, name, passwordHash, role]
+    );
+
+    const newUser = userResult.rows[0];
+
+    // If organizationId provided, add user to organization
+    if (organizationId) {
+      // Validate organization role
+      if (!['member', 'admin'].includes(organizationRole)) {
+        return res.status(400).json({ error: 'Invalid organization role. Must be member or admin' });
+      }
+
+      // Verify organization exists
+      const orgResult = await query('SELECT id, name FROM organizations WHERE id = $1', [organizationId]);
+      if (orgResult.rows.length === 0) {
+        return res.status(400).json({ error: 'Organization not found' });
+      }
+
+      // Add user to organization
+      await query(
+        'INSERT INTO organization_members (user_id, organization_id, role) VALUES ($1, $2, $3)',
+        [newUser.id, organizationId, organizationRole]
+      );
+
+      newUser.organization = {
+        id: organizationId,
+        name: orgResult.rows[0].name,
+        role: organizationRole,
+      };
+    }
+
+    // Log action
+    await query(
+      `INSERT INTO admin_audit_logs (admin_id, action, target_user_id, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        adminId,
+        'create_user',
+        newUser.id,
+        JSON.stringify({
+          email: newUser.email,
+          name: newUser.name,
+          role: newUser.role,
+          organization_id: organizationId || null,
+          organization_role: organizationId ? organizationRole : null,
+        }),
+        req.ip || req.socket.remoteAddress || 'unknown',
+      ]
+    );
+
+    // Send welcome email (optional, don't fail if it doesn't work)
+    try {
+      await sendWelcomeEmail(newUser.email, newUser.name, password);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't fail the request, user was created successfully
+    }
+
+    res.status(201).json({
+      message: 'User created successfully',
+      user: newUser,
+    });
+  } catch (error) {
+    console.error('Create user error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 /**
  * Get all users with optional filtering

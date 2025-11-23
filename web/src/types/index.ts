@@ -29,7 +29,7 @@ export interface Task {
   end_date?: string;
   schedule_type: 'one_time' | 'daily' | 'weekly' | 'monthly';
   schedule_frequency: number;
-  status: 'pending' | 'in_progress' | 'submitted' | 'completed' | 'overdue';
+  status: 'in_progress' | 'submitted' | 'completed' | 'overdue';
   requirements?: TaskRequirement[];
   completions?: TaskCompletion[];
   total_requirements?: number;

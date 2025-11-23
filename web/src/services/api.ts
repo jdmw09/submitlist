@@ -54,6 +54,16 @@ export const authAPI = {
 // Admin API
 export const adminAPI = {
   // User management
+  createUser: (data: {
+    email: string;
+    name: string;
+    password: string;
+    username?: string;
+    role?: 'member' | 'admin' | 'super_admin';
+    organizationId?: number;
+    organizationRole?: 'member' | 'admin';
+  }) => api.post('/admin/users', data),
+
   getAllUsers: (params?: { search?: string; role?: string; status?: string; page?: number; limit?: number }) =>
     api.get('/admin/users', { params }),
 
@@ -144,13 +154,6 @@ export const organizationAPI = {
   getPublicOrganizations: (search?: string) =>
     api.get('/organizations/public', { params: { search } }),
 
-  // Phase 1: Task groups
-  createGroup: (organizationId: number, name: string, description?: string) =>
-    api.post(`/organizations/${organizationId}/groups`, { name, description }),
-
-  getGroups: (organizationId: number) =>
-    api.get(`/organizations/${organizationId}/groups`),
-
   // Organization settings
   getSettings: (organizationId: number) =>
     api.get(`/organizations/${organizationId}/settings`),
@@ -205,7 +208,7 @@ export const taskAPI = {
     api.get(`/tasks/${taskId}/audit-logs`),
 
   // Task copy and archive
-  copy: (taskId: number, data?: { title?: string; endDate?: string; assignedUserIds?: number[]; groupId?: number }) =>
+  copy: (taskId: number, data?: { title?: string; endDate?: string; assignedUserIds?: number[] }) =>
     api.post(`/tasks/${taskId}/copy`, data),
 
   archive: (taskId: number) =>

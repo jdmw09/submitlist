@@ -13,8 +13,6 @@ interface ImportRow {
   schedule_type?: string;
   schedule_frequency?: string | number;
   is_private?: string | boolean;
-  group_id?: string | number;
-  group_name?: string;
   requirements?: string;
   status?: string;
 }
@@ -161,31 +159,6 @@ export class TaskImportService {
       }
     }
 
-    // Validate group
-    if (row.group_name) {
-      const groupExists = await this.validateGroup(row.group_name, orgId);
-      if (!groupExists) {
-        errors.push({
-          row: rowIndex,
-          column: 'group_name',
-          error: `Group '${row.group_name}' not found`,
-          data: row,
-        });
-      }
-    }
-
-    if (row.group_id) {
-      const groupExists = await this.validateGroupById(parseInt(String(row.group_id)), orgId);
-      if (!groupExists) {
-        errors.push({
-          row: rowIndex,
-          column: 'group_id',
-          error: `Group with ID ${row.group_id} not found`,
-          data: row,
-        });
-      }
-    }
-
     // Validate requirements
     if (row.requirements) {
       const reqs = row.requirements.split('|').map((r) => r.trim()).filter((r) => r !== '');
@@ -320,22 +293,10 @@ export class TaskImportService {
       assigneeIds = row.assigned_user_ids.split(',').map((id) => parseInt(id.trim()));
     }
 
-    // Get group ID if group name provided
-    let groupId = row.group_id ? parseInt(String(row.group_id)) : null;
-    if (!groupId && row.group_name) {
-      groupId = await this.getGroupIdByName(row.group_name, organizationId);
-    }
-
-    // If group specified, get all group members as assignees
-    if (groupId) {
-      const groupMembers = await this.getGroupMembers(groupId);
-      assigneeIds = [...new Set([...assigneeIds, ...groupMembers])]; // Merge and dedupe
-    }
-
     // Create task
     const taskResult = await query(
-      `INSERT INTO tasks (organization_id, title, details, start_date, end_date, schedule_type, schedule_frequency, status, created_by_id, group_id, is_private)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO tasks (organization_id, title, details, start_date, end_date, schedule_type, schedule_frequency, status, created_by_id, is_private)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         organizationId,
@@ -345,9 +306,8 @@ export class TaskImportService {
         row.end_date || null,
         row.schedule_type || 'one_time',
         row.schedule_frequency ? parseInt(String(row.schedule_frequency)) : 1,
-        row.status || 'pending',
+        row.status || 'in_progress',
         userId,
-        groupId,
         this.parseBoolean(row.is_private),
       ]
     );
@@ -436,39 +396,4 @@ export class TaskImportService {
     return result.rows.map((r: any) => r.id);
   }
 
-  private async validateGroup(groupName: string, orgId: number): Promise<boolean> {
-    const result = await query(
-      'SELECT id FROM task_groups WHERE organization_id = $1 AND name = $2',
-      [orgId, groupName]
-    );
-
-    return result.rows.length > 0;
-  }
-
-  private async validateGroupById(groupId: number, orgId: number): Promise<boolean> {
-    const result = await query(
-      'SELECT id FROM task_groups WHERE organization_id = $1 AND id = $2',
-      [orgId, groupId]
-    );
-
-    return result.rows.length > 0;
-  }
-
-  private async getGroupIdByName(groupName: string, orgId: number): Promise<number | null> {
-    const result = await query(
-      'SELECT id FROM task_groups WHERE organization_id = $1 AND name = $2',
-      [orgId, groupName]
-    );
-
-    return result.rows.length > 0 ? result.rows[0].id : null;
-  }
-
-  private async getGroupMembers(groupId: number): Promise<number[]> {
-    const result = await query(
-      'SELECT user_id FROM task_group_members WHERE group_id = $1',
-      [groupId]
-    );
-
-    return result.rows.map((r: any) => r.user_id);
-  }
 }

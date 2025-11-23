@@ -227,9 +227,8 @@ const ImportTasksPage: React.FC = () => {
             <li><strong>schedule_type</strong> (optional): one_time, daily, weekly, or monthly</li>
             <li><strong>schedule_frequency</strong> (optional): Number for recurring tasks (e.g., 2 for bi-weekly when schedule_type is weekly)</li>
             <li><strong>is_private</strong> (optional): true or false</li>
-            <li><strong>group_name</strong> (optional): Name of existing group in your organization</li>
             <li><strong>requirements</strong> (optional): Pipe-separated (|) checklist items (max 50, 500 chars each)</li>
-            <li><strong>status</strong> (optional): pending, in_progress, submitted, or completed</li>
+            <li><strong>status</strong> (optional): in_progress, submitted, or completed</li>
           </ul>
           <p className="help-note">Note: Tasks will be imported into your currently selected organization.</p>
         </div>

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  createUser,
   getAllUsers,
   getUserById,
   updateUserRole,
@@ -22,6 +23,7 @@ router.use(authenticateToken);
 router.use(requireAdmin);
 
 // User management
+router.post('/users', createUser); // Create new user
 router.get('/users', getAllUsers);
 router.get('/users/:id', getUserById);
 router.put('/users/:id/role', updateUserRole); // Admin can promote to admin, super_admin can promote to super_admin

@@ -8,24 +8,29 @@ This document outlines the transition from the current basic email/password auth
 
 ## Current State Analysis
 
-### Existing Implementation
+### Existing Implementation (Updated v2.4.0)
 - **Method**: Custom JWT-based email/password authentication
 - **Database**: PostgreSQL users table with bcrypt password hashing
-- **Limitations**:
-  - No email verification
-  - No password reset functionality
+- **Email Service**: Mailgun integration for transactional emails
+- **Current Features**:
+  - Email verification with token-based flow
+  - Password reset functionality via email
+  - Admin user creation with pre-verification
+  - Audit logging for admin actions
+  - Username field (separate from email)
+  - Account status management (active/suspended/deleted)
+  - Role-based access control (member/admin/super_admin)
+- **Remaining Limitations**:
   - No social login options
   - No MFA/2FA support
-  - Manual security management
-  - No audit trail
-  - Username = email address (user concern)
+  - No OAuth2/OIDC compliance
 
-### Security Concerns
-1. Custom auth implementation increases attack surface
-2. No rate limiting on authentication endpoints
-3. No account lockout after failed attempts
-4. No session management/revocation
-5. No OAuth2/OIDC compliance
+### Security Concerns (Remaining)
+1. No rate limiting on authentication endpoints
+2. No account lockout after failed attempts
+3. No session management/revocation (JWT-only)
+4. No OAuth2/OIDC compliance
+5. No MFA/2FA support
 
 ---
 
