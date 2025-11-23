@@ -220,17 +220,18 @@ const ImportTasksPage: React.FC = () => {
           <h3>CSV Format Requirements</h3>
           <ul>
             <li><strong>title</strong> (required): Task title (max 255 characters)</li>
-            <li><strong>organization_id</strong> (required): Your organization ID</li>
             <li><strong>details</strong> (optional): Task description</li>
-            <li><strong>assigned_user_emails</strong> (optional): Comma-separated emails (max 50)</li>
+            <li><strong>assigned_user_emails</strong> (optional): Comma-separated emails of org members (max 50)</li>
             <li><strong>start_date</strong> (optional): YYYY-MM-DD format</li>
             <li><strong>end_date</strong> (optional): YYYY-MM-DD format (must be after start_date)</li>
             <li><strong>schedule_type</strong> (optional): one_time, daily, weekly, or monthly</li>
+            <li><strong>schedule_frequency</strong> (optional): Number for recurring tasks (e.g., 2 for bi-weekly when schedule_type is weekly)</li>
             <li><strong>is_private</strong> (optional): true or false</li>
-            <li><strong>group_name</strong> (optional): Name of existing group</li>
-            <li><strong>requirements</strong> (optional): Pipe-separated (|) requirements (max 50, 500 chars each)</li>
+            <li><strong>group_name</strong> (optional): Name of existing group in your organization</li>
+            <li><strong>requirements</strong> (optional): Pipe-separated (|) checklist items (max 50, 500 chars each)</li>
             <li><strong>status</strong> (optional): pending, in_progress, submitted, or completed</li>
           </ul>
+          <p className="help-note">Note: Tasks will be imported into your currently selected organization.</p>
         </div>
       </div>
     </Layout>

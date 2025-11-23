@@ -245,6 +245,110 @@
   font-weight: 600;
 }
 
+.help-note {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(33, 150, 243, 0.15);
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1565c0;
+}
+
+/* Dark mode support */
+[data-theme="dark"] .page-header h1 {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .import-card {
+  background: var(--color-bg-secondary);
+}
+
+[data-theme="dark"] .section {
+  border-bottom-color: var(--color-border-default);
+}
+
+[data-theme="dark"] .section h2 {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .section p {
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .file-input-label {
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-border-default);
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .file-input-label:hover {
+  background: var(--color-bg-secondary);
+}
+
+[data-theme="dark"] .checkbox-option {
+  background: var(--color-bg-tertiary);
+}
+
+[data-theme="dark"] .checkbox-option span {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .result-section {
+  background: var(--color-bg-tertiary);
+}
+
+[data-theme="dark"] .result-section h2,
+[data-theme="dark"] .result-message {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .stat-item {
+  background: var(--color-bg-secondary);
+}
+
+[data-theme="dark"] .stat-label {
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .stat-value {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .error-item {
+  background: var(--color-bg-secondary);
+}
+
+[data-theme="dark"] .error-column {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .error-message {
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .help-section {
+  background: rgba(33, 150, 243, 0.1);
+  border-left-color: #64b5f6;
+}
+
+[data-theme="dark"] .help-section h3 {
+  color: #90caf9;
+}
+
+[data-theme="dark"] .help-section li {
+  color: #bbdefb;
+}
+
+[data-theme="dark"] .help-section strong {
+  color: #90caf9;
+}
+
+[data-theme="dark"] .help-note {
+  background: rgba(33, 150, 243, 0.2);
+  color: #90caf9;
+}
+
 @media (max-width: 768px) {
   .stats {
     grid-template-columns: 1fr;

@@ -51,10 +51,12 @@ export const importTasks = async (req: AuthRequest, res: Response) => {
 
 // Download CSV template
 export const downloadTemplate = async (req: AuthRequest, res: Response) => {
-  const template = `title,organization_id,details,assigned_user_emails,start_date,end_date,schedule_type,is_private,requirements
-"Example Task 1",1,"This is a sample task description","user1@example.com,user2@example.com",2025-11-21,2025-11-30,one_time,false,"Requirement 1|Requirement 2|Requirement 3"
-"Example Task 2",1,"Another sample task","user3@example.com",2025-11-25,2025-12-01,weekly,true,"Step 1|Step 2"
-"Group Task Example",1,"Task assigned to a group",,2025-11-22,2025-11-25,one_time,false,"Complete step A|Complete step B"`;
+  const template = `title,details,assigned_user_emails,start_date,end_date,schedule_type,schedule_frequency,is_private,group_name,requirements,status
+"Weekly Team Report","Prepare and submit weekly status report","manager@example.com",2025-11-25,2025-12-02,weekly,1,false,,"Review completed tasks|Document blockers|Plan next week",pending
+"Daily Standup Notes","Record daily standup meeting notes","team-lead@example.com,dev@example.com",2025-11-22,,daily,1,false,,"Take attendance|Record updates|Note action items",pending
+"Monthly Inventory Check","Complete monthly inventory audit",,2025-12-01,2025-12-05,monthly,1,false,Warehouse Team,"Count all items|Update spreadsheet|Report discrepancies",pending
+"Bi-Weekly Code Review","Review and approve pending pull requests","senior-dev@example.com",2025-11-25,2025-12-09,weekly,2,true,,"Review PRs|Check test coverage|Approve or request changes",pending
+"One-Time Project Setup","Initial project configuration","admin@example.com",2025-11-22,2025-11-25,one_time,1,false,,"Create repository|Set up CI/CD|Document setup steps",pending`;
 
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename="task_import_template.csv"');
