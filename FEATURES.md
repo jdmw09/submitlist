@@ -10,10 +10,11 @@
 2. [Admin Features](#admin-features)
 3. [Organization Management](#organization-management)
 4. [Task Management](#task-management)
-5. [Email System](#email-system)
-6. [Notifications](#notifications)
-7. [File Management](#file-management)
-8. [Security Features](#security-features)
+5. [Task Import (CSV)](#task-import-csv)
+6. [Email System](#email-system)
+7. [Notifications](#notifications)
+8. [File Management](#file-management)
+9. [Security Features](#security-features)
 
 ---
 
@@ -483,6 +484,56 @@ Organization admins can configure default task display preferences:
 
 ---
 
+## Task Import (CSV) (UPDATED - v2.3.0)
+
+### Overview
+Bulk import tasks from CSV files into your organization. Supports all task creation features including recurring tasks with custom frequency.
+
+### Import Endpoints
+**GET /api/tasks/import/template** - Download CSV template with example data
+**POST /api/tasks/import** - Import tasks from CSV file
+
+### CSV Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| title | Yes | Task title (max 255 characters) |
+| details | No | Task description/details |
+| assigned_user_emails | No | Comma-separated emails of organization members (max 50) |
+| start_date | No | Start date in YYYY-MM-DD format |
+| end_date | No | Due date in YYYY-MM-DD format (must be after start_date) |
+| schedule_type | No | one_time, daily, weekly, or monthly (default: one_time) |
+| schedule_frequency | No | Repeat frequency for recurring tasks (e.g., 2 = every 2 weeks) |
+| is_private | No | true or false (default: false) |
+| group_name | No | Name of existing task group in organization |
+| requirements | No | Pipe-separated (|) checklist items (max 50, 500 chars each) |
+| status | No | pending, in_progress, submitted, or completed (default: pending) |
+
+### Import Options
+- **Validate Only**: Check CSV for errors without creating tasks
+- **Notify Assignees**: Send notifications to assigned users (default: true)
+
+### Import Features
+- Tasks imported to currently selected organization
+- Automatic validation of assignee emails against org members
+- Group validation ensures groups exist in organization
+- Detailed error reporting by row and column
+- Partial import on validation errors (valid rows created)
+- Audit logging for imported tasks
+
+### Example CSV
+```csv
+title,details,assigned_user_emails,start_date,end_date,schedule_type,schedule_frequency,is_private,group_name,requirements,status
+"Weekly Team Report","Prepare weekly status report","manager@example.com",2025-11-25,2025-12-02,weekly,1,false,,"Review tasks|Document blockers",pending
+"Bi-Weekly Code Review","Review pending PRs","dev@example.com",2025-11-25,2025-12-09,weekly,2,true,,"Review PRs|Check coverage",pending
+```
+
+### UI Location
+- Web: Tasks page → "Import Tasks" button → Import Tasks page
+- Download template, upload CSV, validate, and import
+
+---
+
 ## Task Copy (NEW - v2.2.0)
 
 ### Copy Task Feature
@@ -699,6 +750,7 @@ X-XSS-Protection: 1; mode=block
 - **Organization task settings** (v2.2.0)
 - **Task comments/discussions** (v2.3.0)
 - **Enhanced recurring tasks with frequency** (v2.3.0)
+- **CSV task import with schedule_frequency support** (v2.3.0)
 - Audit logging
 - Email system (Mailgun)
 - Notifications

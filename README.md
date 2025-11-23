@@ -11,6 +11,7 @@ A full-stack task management system with scheduled tasks, team collaboration, an
 - One-time and scheduled tasks (daily, weekly, monthly)
 - **Task comments** - Threaded discussions on tasks with notifications
 - **Enhanced recurring tasks** - Configurable frequency (every N days/weeks/months)
+- **CSV task import** - Bulk import tasks with full feature support
 - **Task sorting** - Sort by due date (default) or priority
 - **Task archive** - Archive completed tasks manually or automatically
 - **Organization settings** - Configurable task display and archive preferences
@@ -258,6 +259,10 @@ After seeding the database, you can login with:
 - `POST /api/tasks/:taskId/comments` - Add comment
 - `PUT /api/comments/:commentId` - Update own comment
 - `DELETE /api/comments/:commentId` - Delete own comment
+
+### Task Import
+- `GET /api/tasks/import/template` - Download CSV template
+- `POST /api/tasks/import` - Import tasks from CSV file
 
 ### Notifications
 - `GET /api/notifications` - Get user notifications
